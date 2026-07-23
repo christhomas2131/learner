@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
+from app.api.errors import NotFoundError
 from app.api.schemas import AskRequest, EnqueueResponse
 from app.db.base import AsyncSessionLocal
 from app.models import User
@@ -24,7 +25,7 @@ from app.pipeline.events import COMPLETED, PipelineEvent
 from app.schemas.api import AnswerResponse
 from app.services import queue as queue_svc
 from app.services.answering import answer_and_persist
-from app.services.audit import to_response
+from app.services.audit import load_answer_response, to_response
 from app.services.sessions import add_user_message, ensure_session, touch_session
 from app.services.user import get_or_create_demo_user
 
@@ -57,6 +58,18 @@ async def create_answer(
         subject_id=body.subject_id, approved_source_ids=body.approved_source_ids,
     )
     return to_response(result, audit_id=audit_id)
+
+
+@router.get("/answers/{answer_id}", response_model=AnswerResponse)
+async def get_answer(
+    answer_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AnswerResponse:
+    resp = await load_answer_response(session, user, answer_id)
+    if resp is None:
+        raise NotFoundError("Answer not found.")
+    return resp
 
 
 @router.post("/answers/stream")

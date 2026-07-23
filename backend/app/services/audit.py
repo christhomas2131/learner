@@ -3,6 +3,7 @@ and an immutable audit record."""
 
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import new_uuid, utcnow
@@ -12,6 +13,8 @@ from app.models import (
     Citation,
     Claim,
     Message,
+    Session,
+    User,
     VerificationResult,
 )
 from app.pipeline.engine import PipelineResult
@@ -74,6 +77,28 @@ async def persist_result(
 
     await session.commit()
     return answer.id, audit.id
+
+
+async def load_answer_response(
+    session: AsyncSession, user: User, answer_id: str
+) -> AnswerResponse | None:
+    """Reconstruct the full AnswerResponse for a persisted answer (ownership-scoped)."""
+    ans = (
+        await session.execute(
+            select(Answer).join(Session, Answer.session_id == Session.id)
+            .where(Answer.id == answer_id, Session.user_id == user.id)
+        )
+    ).scalars().first()
+    if ans is None:
+        return None
+    audit = (
+        await session.execute(select(AuditRecord).where(AuditRecord.answer_id == answer_id))
+    ).scalars().first()
+    if audit and audit.snapshot:
+        data = dict(audit.snapshot)
+        data["audit_id"] = audit.id
+        return AnswerResponse.model_validate(data)
+    return None
 
 
 def _snapshot(result: PipelineResult) -> dict:
