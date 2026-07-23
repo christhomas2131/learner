@@ -99,7 +99,7 @@ async def stream_answer(
                         )
                         await events.put(("__enqueued__", {
                             "queue_id": item.id, "session_id": sess.id,
-                            "request_id": item.request_id, "status": item.status.value,
+                            "request_id": item.request_id, "status": str(item.status),
                         }))
                     else:
                         result, _aid, audit_id, _sid = await answer_and_persist(

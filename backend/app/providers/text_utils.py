@@ -11,6 +11,8 @@ import re
 _WS = re.compile(r"\s+")
 _TOKEN = re.compile(r"[A-Za-z0-9]+")
 _SENT = re.compile(r"(?<=[.!?])\s+")
+_HEADING_LINE = re.compile(r"^\s{0,3}#{1,6}\s+.*$")
+_LIST_PREFIX = re.compile(r"^\s{0,3}(?:[-*+>]\s+|\d+\.\s+)")
 
 # Common words that must not drive retrieval or relevance scoring.
 STOPWORDS = frozenset(
@@ -43,14 +45,30 @@ def content_tokens(s: str) -> list[str]:
     return [t for t in tokens(s) if len(t) > 1 and t not in STOPWORDS]
 
 
+def clean_markdown(s: str) -> str:
+    """Drop standalone heading lines and leading list/quote markers.
+
+    Only removes whole heading lines and line-leading markers, so the result
+    stays a normalized substring of the original passage (the verifier's
+    substring check still passes).
+    """
+    kept: list[str] = []
+    for line in s.splitlines():
+        if _HEADING_LINE.match(line):
+            continue
+        kept.append(_LIST_PREFIX.sub("", line))
+    out = " ".join(" ".join(kept).split())
+    return out or s.strip()
+
+
 def split_sentences(text: str) -> list[str]:
     parts = [p.strip() for p in _SENT.split(text.strip()) if p.strip()]
     return parts or ([text.strip()] if text.strip() else [])
 
 
 def best_sentence(passage_text: str, question: str) -> str:
-    """Pick the passage sentence with the most content-word overlap."""
-    return _best_sentence_scored(passage_text, question)[0]
+    """Pick the passage sentence with the most content-word overlap (markdown-cleaned)."""
+    return clean_markdown(_best_sentence_scored(passage_text, question)[0])
 
 
 def _best_sentence_scored(passage_text: str, question: str) -> tuple[str, int]:

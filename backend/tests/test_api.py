@@ -132,6 +132,26 @@ async def test_premium_enqueues(client):
     assert r.json()["total"] == 1
 
 
+async def test_sse_stream_premium_enqueues(client):
+    await _seed_bio_source()
+    events: list[str] = []
+    payload = None
+    async with client.stream("POST", "/api/v1/answers/stream",
+                             json={"question": "Explain photosynthesis", "mode": "premium"}) as resp:
+        assert resp.status_code == 200
+        current = None
+        async for line in resp.aiter_lines():
+            if line.startswith("event:"):
+                current = line.split(":", 1)[1].strip()
+                events.append(current)
+            elif line.startswith("data:") and current == "queued":
+                import json
+                payload = json.loads(line.split(":", 1)[1].strip())
+    assert "failed" not in events
+    assert "queued" in events
+    assert payload and payload["status"] == "PENDING" and payload["queue_id"]
+
+
 async def test_sse_stream_order_and_final(client):
     await _seed_bio_source()
     events: list[str] = []

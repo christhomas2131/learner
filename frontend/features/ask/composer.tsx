@@ -1,11 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUp, Loader2, ShieldCheck, Sparkles, X } from "lucide-react";
+import dynamic from "next/dynamic";
+import { ArrowUp, ShieldCheck, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
+
+// WebGL liquid-metal effect: SSR-safe, but mount client-only to be safe.
+const MetalFx = dynamic(() => import("metal-fx").then((m) => m.MetalFx), { ssr: false });
 
 export type AskMode = "grounded" | "premium";
 
@@ -26,6 +31,7 @@ export function Composer({
 }) {
   const [value, setValue] = React.useState("");
   const [mode, setMode] = React.useState<AskMode>("grounded");
+  const reduced = useReducedMotion();
 
   function submit() {
     const q = value.trim();
@@ -75,10 +81,19 @@ export function Composer({
               <X className="size-4" /> Cancel
             </Button>
           ) : (
-            <Button size="sm" onClick={submit} disabled={!value.trim() || streaming}>
-              {streaming ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-              Ask
-            </Button>
+            <MetalFx variant="circle" preset="chromatic" theme="auto" paused={reduced}
+              style={{ borderRadius: 9999 }}>
+              <button
+                type="button"
+                onClick={submit}
+                disabled={!value.trim()}
+                aria-label="Ask"
+                className="flex size-9 items-center justify-center rounded-full transition-opacity disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {/* difference blend keeps the arrow legible over light OR dark metal */}
+                <ArrowUp className="size-4 text-white" style={{ mixBlendMode: "difference" }} />
+              </button>
+            </MetalFx>
           )}
         </div>
       </div>

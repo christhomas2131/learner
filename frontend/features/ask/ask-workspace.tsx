@@ -1,11 +1,18 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
-import { PanelRightClose, PanelRightOpen, Sparkles } from "lucide-react";
+import { BorderBeam } from "border-beam";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { Button } from "@/components/ui/button";
+
+const ThinkingOrb = dynamic(() => import("thinking-orbs").then((m) => m.ThinkingOrb), {
+  ssr: false,
+});
 import { answerResponse, type AnswerResponse } from "@/lib/api/schemas";
 import { streamAnswer } from "@/lib/api/sse";
 import { useAnswer, useQueueItem } from "@/lib/api/hooks";
@@ -46,6 +53,7 @@ export function AskWorkspace({
   suggestions?: string[];
 }) {
   const qc = useQueryClient();
+  const reduced = useReducedMotion();
   const [run, setRun] = React.useState<RunState>(() => ({
     ...INITIAL,
     answer: initialAnswer ?? null,
@@ -180,18 +188,20 @@ export function AskWorkspace({
             </p>
           )}
 
-          {(run.streaming || waitingPremium) && (
-            <>
-              {waitingPremium ? (
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm">
-                  <Sparkles className="size-4 animate-pulse text-primary" />
-                  <span>{run.lastMessage}</span>
-                </div>
-              ) : (
+          {waitingPremium ? (
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm">
+              <ThinkingOrb state="working" size={64} theme="auto" paused={reduced}
+                style={{ width: 40, height: 40 }} aria-label="Waiting for a Claude Code worker" />
+              <span>{run.lastMessage}</span>
+            </div>
+          ) : (
+            run.streaming && (
+              <BorderBeam size="md" colorVariant="ocean" theme="auto" active={!reduced}
+                borderRadius={12}>
                 <PipelineProgress reached={run.reached} activeStage={run.activeStage}
                   done={false} lastMessage={run.lastMessage} />
-              )}
-            </>
+              </BorderBeam>
+            )
           )}
 
           {run.error && (
