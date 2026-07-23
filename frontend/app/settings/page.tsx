@@ -20,9 +20,13 @@ function useLocalFlag(key: string, initial = false) {
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
   const [reducedMotion, setReducedMotion] = useLocalFlag("reduce-motion");
   const [diagnostics, setDiagnostics] = useLocalFlag("dev-diagnostics");
   const [fontSize, setFontSize] = React.useState("md");
+
+  React.useEffect(() => setMounted(true), []);
+  const activeTheme = mounted ? theme : undefined;
 
   React.useEffect(() => {
     document.documentElement.classList.toggle("reduce-motion", reducedMotion);
@@ -58,7 +62,7 @@ export default function SettingsPage() {
                 <Button
                   key={t}
                   size="sm"
-                  variant={theme === t ? "secondary" : "ghost"}
+                  variant={activeTheme === t ? "secondary" : "ghost"}
                   onClick={() => setTheme(t)}
                   className="capitalize"
                 >

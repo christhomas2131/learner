@@ -1,0 +1,57 @@
+# Personal single-user deployment. Backend uses SQLite on a persistent volume
+# (retrieval is SQLite FTS5). A Postgres service is included but commented out —
+# wiring it requires implementing a Postgres retriever (see the Retriever
+# abstraction). Docker artifacts here are written but NOT run-verified in the
+# build environment (Docker was not installed).
+
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      APP_ENV: docker
+      MODEL_PROVIDER: none
+      DATABASE_URL: sqlite+aiosqlite:////data/learner.db
+      UPLOAD_DIRECTORY: /data/uploads
+      CORS_ORIGINS: http://localhost:3000
+    volumes:
+      - learner_data:/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # --- Optional future Postgres (requires a Postgres retriever implementation) ---
+  # postgres:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_USER: learner
+  #     POSTGRES_PASSWORD: learner
+  #     POSTGRES_DB: learner
+  #   volumes:
+  #     - learner_pg:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U learner"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  learner_data:
+  # learner_pg:
