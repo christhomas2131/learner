@@ -20,7 +20,7 @@ from app.core.enums import (
 )
 from app.core.logging import get_logger
 from app.pipeline import gate
-from app.pipeline.contradiction import find_contradiction
+from app.pipeline.contradiction import ContradictionHit, find_contradiction
 from app.pipeline.events import (
     CLAIM_VERIFICATION,
     COMPLETED,
@@ -70,6 +70,7 @@ class _ClaimState:
     material: bool
     status: ClaimStatus = ClaimStatus.INSUFFICIENT_EVIDENCE
     evidence: list[EvidenceOut] = field(default_factory=list)
+    contradiction_hit: ContradictionHit | None = None
 
 
 @dataclass
@@ -448,6 +449,7 @@ class VerifiedLearningPipeline:
             hit = find_contradiction(cs.text, source_ids, passages)
             if hit is not None:
                 cs.status = ClaimStatus.CONTRADICTED
+                cs.contradiction_hit = hit
                 cs.evidence = cs.evidence + [
                     EvidenceOut(
                         source_id=hit.source_id, passage_id=hit.passage_id,
@@ -563,12 +565,19 @@ def _render_answer(
 
 def _contradiction_detail(claim_states: list[_ClaimState]) -> str:
     for cs in claim_states:
-        if cs.status == ClaimStatus.CONTRADICTED:
-            quotes = "; ".join(e.quotation for e in cs.evidence)
-            return (
-                f"The approved materials conflict regarding: \"{cs.text}\". "
-                f"Contradicting evidence: {quotes}"
+        if cs.status != ClaimStatus.CONTRADICTED:
+            continue
+        hit = cs.contradiction_hit
+        if hit is not None:
+            support = next(
+                (e.quotation for e in cs.evidence if e.passage_id != hit.passage_id), None
             )
+            parts = [f'The approved materials conflict on: "{cs.text}"']
+            if support and support.strip() != cs.text.strip():
+                parts.append(f'One approved source states: "{support}"')
+            parts.append(f'Another approved source states: "{hit.quotation}"')
+            return " ".join(parts)
+        return f'The approved materials conflict regarding: "{cs.text}".'
     return "The approved sources conflict."
 
 

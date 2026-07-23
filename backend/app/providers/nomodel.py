@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from app.core.enums import ClaimStatus
 from app.providers.base import ModelProvider
-from app.providers.text_utils import best_sentence, quotation_in_passage, sentence_relevance
+from app.providers.text_utils import (
+    best_sentence,
+    content_tokens,
+    normalize_text,
+    quotation_in_passage,
+)
 from app.schemas.pipeline import (
     DraftClaim,
     DraftResponse,
@@ -24,7 +29,7 @@ class NoModelProvider(ModelProvider):
     name = "none"
     model_identifier = None
 
-    def __init__(self, max_claims: int = 3) -> None:
+    def __init__(self, max_claims: int = 4) -> None:
         self._max_claims = max_claims
 
     async def draft(
@@ -33,20 +38,48 @@ class NoModelProvider(ModelProvider):
         passages: list[RetrievedPassage],
         previous_unsupported: list[str] | None = None,
     ) -> DraftResponse:
-        # Scan ALL retrieved passages (not just the first few) and assert a claim
-        # only when a passage shares topical content with the question. This keeps
-        # grounded answers conservative even if a hybrid retriever reorders the
-        # pool so that a lexical match sits below a semantic-only one.
+        # Gather the most relevant sentence from each passage that shares topical
+        # content with the question, then order by relevance and drop near-
+        # duplicates so the grounded answer reads as clean prose rather than
+        # repeating the same fact. Every sentence stays a verbatim substring, so
+        # the verifier still confirms it — this is synthesis, never generation.
+        # Relevance guard for extractive answers: a sentence is relevant when it
+        # shares 2+ content words with the question, OR shares one *substantive*
+        # word (length >= 6, e.g. "photosynthesis"). A single short common word
+        # ("world", "cup") is never enough. Single-content-word questions
+        # ("What is DNA?") only need that one word.
+        q_content = set(content_tokens(question))
+        single = len(q_content) <= 1
+
+        def _relevant(overlap: set[str]) -> bool:
+            if single:
+                return len(overlap) >= 1
+            return len(overlap) >= 2 or any(len(t) >= 6 for t in overlap)
+
+        candidates: list[tuple[int, str, RetrievedPassage]] = []
+        for p in passages:
+            sentence = best_sentence(p.text, question).strip()
+            if not sentence:
+                continue
+            overlap = q_content & set(content_tokens(sentence))
+            if not _relevant(overlap):
+                continue
+            candidates.append((len(overlap), sentence, p))
+
+        candidates.sort(key=lambda c: c[0], reverse=True)
+
         claims: list[DraftClaim] = []
         answer_parts: list[str] = []
-        n = 0
-        for p in passages:
+        seen: list[str] = []
+        for _score, sentence, p in candidates:
             if len(claims) >= self._max_claims:
                 break
-            sentence = best_sentence(p.text, question).strip()
-            if not sentence or sentence_relevance(p.text, question) < 1:
+            norm = normalize_text(sentence)
+            # Skip if this sentence is contained in (or contains) one already used.
+            if any(norm in s or s in norm for s in seen):
                 continue
-            n += 1
+            seen.append(norm)
+            n = len(claims) + 1
             claims.append(
                 DraftClaim(
                     claim_id=f"claim-{n}",
@@ -56,8 +89,7 @@ class NoModelProvider(ModelProvider):
                 )
             )
             answer_parts.append(f"{sentence} [{n}]")
-        answer = " ".join(answer_parts)
-        return DraftResponse(answer=answer, claims=claims)
+        return DraftResponse(answer=" ".join(answer_parts), claims=claims)
 
     async def verify(
         self,

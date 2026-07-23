@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { useWorkerStatus } from "@/lib/api/hooks";
 
 // WebGL liquid-metal effect: SSR-safe, but mount client-only to be safe.
 const MetalFx = dynamic(() => import("metal-fx").then((m) => m.MetalFx), { ssr: false });
@@ -32,6 +33,8 @@ export function Composer({
   const [value, setValue] = React.useState("");
   const [mode, setMode] = React.useState<AskMode>("grounded");
   const reduced = useReducedMotion();
+  const { data: worker } = useWorkerStatus();
+  const workerOnline = worker?.online ?? false;
 
   function submit() {
     const q = value.trim();
@@ -71,6 +74,18 @@ export function Composer({
             label="Premium"
             tip="Fluent answer drafted + verified by a running Claude Code worker session. Same evidence gate."
           />
+          <span
+            className="ml-1 flex items-center gap-1 text-[11px] text-muted-foreground"
+            title={workerOnline ? "Claude Code worker online" : "No Claude Code worker running"}
+          >
+            <span
+              className={cn(
+                "size-1.5 rounded-full",
+                workerOnline ? "bg-verified" : "bg-muted-foreground/40",
+              )}
+            />
+            {workerOnline ? "worker online" : "no worker"}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground" aria-live="polite">
@@ -97,6 +112,12 @@ export function Composer({
           )}
         </div>
       </div>
+      {mode === "premium" && !workerOnline && (
+        <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+          No Claude Code worker is running — premium questions will queue until one is.
+          Grounded answers work right now.
+        </p>
+      )}
     </div>
   );
 }

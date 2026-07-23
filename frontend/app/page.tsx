@@ -2,9 +2,11 @@ import { AskWorkspace } from "@/features/ask/ask-workspace";
 
 const SUGGESTIONS = [
   "What is photosynthesis?",
-  "When was the Roman Republic established?",
+  "What are Newton's laws of motion?",
   "What is 15% of 240?",
-  "What is cellular respiration?",
+  "Is Pluto a planet?",
+  "How many continents are there?",
+  "Tell me about Julius Caesar",
 ];
 
 export default function HomePage() {

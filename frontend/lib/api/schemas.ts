@@ -195,6 +195,12 @@ export const analytics = z.object({
 });
 export type Analytics = z.infer<typeof analytics>;
 
+export const workerStatus = z.object({
+  online: z.boolean(),
+  last_seen: z.string().nullable(),
+});
+export type WorkerStatus = z.infer<typeof workerStatus>;
+
 export function page<T extends z.ZodTypeAny>(item: T) {
   return z.object({
     items: z.array(item),

@@ -18,6 +18,7 @@ import {
   sessionOut,
   sourceOut,
   subjectOut,
+  workerStatus,
   type Analytics,
   type QueueItemOut,
   type SessionDetail,
@@ -146,6 +147,15 @@ export function useAnalytics() {
   return useQuery<Analytics>({
     queryKey: keys.analytics,
     queryFn: () => apiFetch("/api/v1/analytics", analytics),
+  });
+}
+
+export function useWorkerStatus() {
+  return useQuery({
+    queryKey: ["worker-status"],
+    queryFn: () => apiFetch("/api/v1/worker/status", workerStatus),
+    refetchInterval: 10_000,
+    retry: false,
   });
 }
 

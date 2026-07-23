@@ -68,6 +68,8 @@ def main() -> None:
     ask.add_argument("question")
     ask.add_argument("--provider", choices=[k.value for k in ModelProviderKind], default=None)
 
+    ws = sub.add_parser("worker-serve", help="Keep-alive loop: heartbeat + auto-finish deterministic")
+    ws.add_argument("--interval", type=int, default=10)
     sub.add_parser("worker-list", help="List pending premium (Claude Code) questions")
     wp = sub.add_parser("worker-prep", help="Claim + retrieve for a premium question")
     wp.add_argument("item_id")
@@ -83,6 +85,10 @@ def main() -> None:
         asyncio.run(_cmd_seed())
     elif args.command == "ask":
         asyncio.run(_cmd_ask(args.question, args.provider))
+    elif args.command == "worker-serve":
+        from app.worker import worker_serve
+
+        asyncio.run(worker_serve(args.interval))
     elif args.command == "worker-list":
         from app.worker import worker_list
 

@@ -160,9 +160,11 @@ async def ingest_structured(
     records_out: list[dict] = []
     for i, rec in enumerate(records):
         value = rec.get("definition") if source_type == SourceType.STRUCTURED_RECORD else rec.get("answer")
-        key = rec.get("term") if source_type == SourceType.STRUCTURED_RECORD else rec.get("question")
-        passage_text = f"{key}: {value}" if source_type == SourceType.STRUCTURED_RECORD else value
-        passage = SourcePassage(source_id=source.id, chunk_index=i, text=passage_text or "",
+        # Passage text is the value only (no "term:" prefix) so it reads cleanly
+        # and stays a valid substring for the verifier; the term/question lives in
+        # structured_data for the deterministic resolver.
+        passage_text = value or ""
+        passage = SourcePassage(source_id=source.id, chunk_index=i, text=passage_text,
                                 char_start=0, char_end=len(passage_text or ""))
         session.add(passage)
         await session.flush()

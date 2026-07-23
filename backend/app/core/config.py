@@ -60,6 +60,14 @@ class Settings(BaseSettings):
 
     DEMO_USER_ID: str = "00000000-0000-0000-0000-000000000001"
 
+    # Premium worker presence: the worker writes a heartbeat file; the API
+    # reports "online" if it was touched within this many seconds.
+    WORKER_HEARTBEAT_TTL: int = 45
+
+    @property
+    def heartbeat_path(self) -> Path:
+        return BACKEND_DIR / ".worker_heartbeat"
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def _split_origins(cls, v: object) -> object:

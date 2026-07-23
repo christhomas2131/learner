@@ -142,6 +142,22 @@ async def test_unapproved_passage_not_retrieved():
     assert r.status == TopLevelStatus.INSUFFICIENT_EVIDENCE
 
 
+async def test_single_common_word_overlap_abstains():
+    # One shared short common word ("world") must not verify an answer.
+    passages = [make_passage("p-w", "The world is a very big place indeed.", source_id="s-w")]
+    p = _pipeline(passages, NoModelProvider())
+    r = await p.run(request_id=REQ, question="Who won the world cup final?")
+    assert r.status == TopLevelStatus.INSUFFICIENT_EVIDENCE
+
+
+async def test_single_substantive_word_overlap_verifies():
+    # One shared substantive word ("photosynthesis") is enough.
+    passages = [make_passage("p-p", "Photosynthesis is a biological process in plants.")]
+    p = _pipeline(passages, NoModelProvider())
+    r = await p.run(request_id=REQ, question="please explain photosynthesis")
+    assert r.status == TopLevelStatus.VERIFIED
+
+
 async def test_source_filter_restricts_retrieval(bio_passages):
     p = _pipeline(bio_passages, NoModelProvider())
     r = await p.run(request_id=REQ, question="What is photosynthesis?",

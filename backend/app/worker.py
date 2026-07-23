@@ -3,26 +3,27 @@
 This is how the user's Claude Code session powers premium answers WITHOUT an API
 key. The worker runs the identical Python pipeline; at the draft and verify
 steps the model is *you* (the Claude Code agent operating this CLI). The harness
-still validates every quotation and applies the release gate — the model cannot
-bypass it.
+still validates every quotation and applies the release gate.
 
-Flow (driven interactively from a Claude Code session):
-  1. `learner worker-prep <id>`  -> claims the item, retrieves passages, prints
-     the DRAFT prompt. If the question is deterministically resolvable it is
-     finished immediately.
-  2. You write the draft JSON and the verify JSON to files.
-  3. `learner worker-finish <id> <draft.json> <verify.json>` -> runs the full
-     pipeline with your JSON as the model output, persists, marks the item DONE.
+Commands:
+  learner worker-serve                 keep-alive loop: heartbeats (UI shows the
+                                       worker online) + auto-finishes any
+                                       deterministically-resolvable questions.
+  learner worker-list                  show pending premium questions.
+  learner worker-prep <id>             claim + retrieve; prints the DRAFT prompt.
+  learner worker-finish <id> d.json v.json   run the pipeline with your JSON.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 from app.core.config import settings
 from app.core.enums import QueueStatus
 from app.db.base import AsyncSessionLocal
 from app.db.init_db import create_all
+from app.models import QuestionQueue, User
 from app.pipeline.resolvers import (
     answer_key_resolver,
     definition_resolver,
@@ -37,10 +38,33 @@ from app.services.audit import persist_result, to_response
 from app.services.pipeline_runner import build_pipeline
 from app.services.records import load_resolver_records
 from app.services.user import get_or_create_demo_user
+from app.services.worker_status import touch_heartbeat
+
+
+async def _is_deterministic(session, user_id: str, question: str) -> bool:
+    definitions, answer_keys = await load_resolver_records(session, user_id)
+    return bool(
+        resolve_computational(question)
+        or definition_resolver(question, definitions)
+        or answer_key_resolver(question, answer_keys)
+    )
+
+
+async def _finish(session, user: User, item: QuestionQueue, question: str) -> str:
+    """Run the pipeline for `item` (deterministic or abstain) and mark it DONE."""
+    pipeline = await build_pipeline(session, user.id, provider=ClaudeCodeProvider())
+    result = await pipeline.run(
+        request_id=item.request_id, question=question, session_id=item.session_id,
+        approved_source_ids=item.approved_source_ids,
+    )
+    answer_id, _audit = await persist_result(session, user_id=user.id, result=result)
+    await queue_svc.complete_item(session, item, answer_id)
+    return str(result.status)
 
 
 async def worker_list() -> None:
     await create_all()
+    touch_heartbeat()
     async with AsyncSessionLocal() as s:
         user = await get_or_create_demo_user(s)
         items, total = await queue_svc.list_items(s, user, QueueStatus.PENDING, limit=100)
@@ -53,6 +77,7 @@ async def worker_list() -> None:
 
 async def worker_prep(item_id: str) -> None:
     await create_all()
+    touch_heartbeat()
     async with AsyncSessionLocal() as s:
         user = await get_or_create_demo_user(s)
         item = await queue_svc.get_item(s, user, item_id)
@@ -66,33 +91,16 @@ async def worker_prep(item_id: str) -> None:
         await s.commit()
 
         question = " ".join(item.question.split())
-        definitions, answer_keys = await load_resolver_records(s, user.id)
-
-        # Deterministic short-circuit: finish now, no drafting needed.
-        if (resolve_computational(question)
-                or definition_resolver(question, definitions)
-                or answer_key_resolver(question, answer_keys)):
-            provider = ClaudeCodeProvider()  # won't be called for deterministic
-            pipeline = await build_pipeline(s, user.id, provider=provider)
-            result = await pipeline.run(request_id=item.request_id, question=question,
-                                        session_id=item.session_id,
-                                        approved_source_ids=item.approved_source_ids)
-            answer_id, _audit = await persist_result(s, user_id=user.id, result=result)
-            await queue_svc.complete_item(s, item, answer_id)
-            print(f"Deterministically resolved -> {result.status}. Item DONE.")
+        if await _is_deterministic(s, user.id, question):
+            status = await _finish(s, user, item, question)
+            print(f"Deterministically resolved -> {status}. Item DONE.")
             return
 
         retriever = SqliteFtsRetriever(s, min_score=settings.RETRIEVAL_MIN_SCORE)
-        passages = await retriever.retrieve(question, item.approved_source_ids,
-                                            settings.RETRIEVAL_LIMIT)
+        passages = await retriever.retrieve(question, item.approved_source_ids, settings.RETRIEVAL_LIMIT)
         if not passages:
-            result = await (await build_pipeline(s, user.id, provider=ClaudeCodeProvider())).run(
-                request_id=item.request_id, question=question, session_id=item.session_id,
-                approved_source_ids=item.approved_source_ids,
-            )
-            answer_id, _ = await persist_result(s, user_id=user.id, result=result)
-            await queue_svc.complete_item(s, item, answer_id)
-            print(f"No approved passages -> {result.status} (abstained). Item DONE.")
+            status = await _finish(s, user, item, question)
+            print(f"No approved passages -> {status} (abstained). Item DONE.")
             return
 
         print("=" * 70)
@@ -103,13 +111,11 @@ async def worker_prep(item_id: str) -> None:
 
 async def worker_finish(item_id: str, draft_path: str, verify_path: str) -> None:
     await create_all()
+    touch_heartbeat()
     with open(draft_path) as f:
-        draft_dict = json.load(f)
+        draft = DraftResponse.model_validate(json.load(f))
     with open(verify_path) as f:
-        verify_list = json.load(f)
-
-    draft = DraftResponse.model_validate(draft_dict)
-    verifier_results = [VerifierResult.model_validate(v) for v in verify_list]
+        verifier_results = [VerifierResult.model_validate(v) for v in json.load(f)]
 
     async def draft_fn(_q, _p, _prev):  # noqa: ANN001, ANN202
         return draft
@@ -139,6 +145,27 @@ async def worker_finish(item_id: str, draft_path: str, verify_path: str) -> None
         resp = to_response(result, audit_id=audit_id)
         print(f"=== STATUS: {resp.status} ===")
         print(resp.answer or "(no answer)")
-        for c in resp.claims:
-            print(f"  [{c.status}] {c.text}")
         print(f"Item {item_id} -> DONE (answer {answer_id})")
+
+
+async def worker_serve(interval: int = 10) -> None:
+    """Keep-alive loop: heartbeat + auto-finish deterministic items.
+
+    Model-needing questions are left PENDING and reported so you can run
+    worker-prep / worker-finish on them.
+    """
+    await create_all()
+    print(f"Worker serving (heartbeat every {interval}s). Ctrl-C to stop.")
+    while True:
+        touch_heartbeat()
+        async with AsyncSessionLocal() as s:
+            user = await get_or_create_demo_user(s)
+            items, _ = await queue_svc.list_items(s, user, QueueStatus.PENDING, limit=100)
+            for item in items:
+                question = " ".join(item.question.split())
+                if await _is_deterministic(s, user.id, question):
+                    status = await _finish(s, user, item, question)
+                    print(f"[worker] auto-resolved {item.id} -> {status}")
+                else:
+                    print(f"[worker] needs drafting: {item.id} | {item.question}")
+        await asyncio.sleep(interval)

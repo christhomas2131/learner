@@ -5,6 +5,8 @@
 
 # --- Local databases ---
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 
@@ -15,6 +17,9 @@ uploads/
 # --- Logs ---
 *.log
 logs/
+
+# --- Worker heartbeat ---
+.worker_heartbeat
 
 # --- Python ---
 __pycache__/
