@@ -1,0 +1,47 @@
+# --- Secrets / env ---
+.env
+.env.local
+*.env
+
+# --- Local databases ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Uploaded files (never commit user content) ---
+backend/uploads/
+uploads/
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+coverage.xml
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+next-env.d.ts
+.turbo/
+
+# --- Playwright ---
+test-results/
+playwright-report/
+playwright/.cache/
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
