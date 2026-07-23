@@ -42,7 +42,7 @@ export function Sidebar({
         <div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <ShieldCheck className="size-4" />
         </div>
-        {!collapsed && <span className="font-semibold tracking-tight">Learner</span>}
+        {!collapsed && <span className="font-display text-lg font-semibold tracking-tight">Learner</span>}
         <Button
           variant="ghost"
           size="icon"
@@ -95,7 +95,7 @@ export function Sidebar({
           </div>
 
           <div className="mt-2 flex-1 overflow-y-auto scroll-slim px-1">
-            <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Recent sessions</p>
+            <p className="eyebrow px-2 py-1 text-muted-foreground">Recent sessions</p>
             {data?.items.length ? (
               <ul className="flex flex-col gap-0.5">
                 {data.items.map((s) => {

@@ -15,7 +15,8 @@ export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDiv
 }
 
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn("font-semibold leading-tight tracking-tight", className)} {...props} />;
+  // h2: section headings live under a single page-level h1 (no skipped levels).
+  return <h2 className={cn("font-semibold leading-tight tracking-tight", className)} {...props} />;
 }
 
 export function CardDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {

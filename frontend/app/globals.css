@@ -116,6 +116,7 @@
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
 }
 
 * {
@@ -128,6 +129,27 @@ body {
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Headings use the display serif for a distinct editorial voice + real
+   hierarchy against the sans body. */
+h1, h2, h3, .font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  letter-spacing: -0.015em;
+  font-weight: 500;
+}
+
+/* Mono "eyebrow" labels (section kickers, metadata) — the third type role. */
+.eyebrow {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.6875rem;
+}
+
+/* Constrain prose measure so paragraphs never run too wide to read. */
+.measure {
+  max-width: 62ch;
 }
 
 ::selection {

@@ -55,8 +55,8 @@ export default function LibraryPage() {
   return (
     <div className="mx-auto h-full w-full max-w-5xl overflow-y-auto scroll-slim p-5 md:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Knowledge library</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-3xl font-semibold tracking-tight">Knowledge library</h1>
+        <p className="measure mt-2 text-sm text-muted-foreground">
           Uploaded material is never trusted until you approve it. Only approved sources are used as
           evidence.
         </p>

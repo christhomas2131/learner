@@ -16,7 +16,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Desktop / tablet sidebar */}
       <aside
         className={cn(
-          "hidden shrink-0 border-r border-border bg-subtle transition-[width] md:block",
+          "hidden shrink-0 border-r border-border bg-subtle md:block",
           collapsed ? "w-16" : "w-72",
         )}
       >

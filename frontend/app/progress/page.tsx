@@ -164,8 +164,8 @@ function Wrap({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto h-full w-full max-w-5xl space-y-4 overflow-y-auto scroll-slim p-5 md:p-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Progress</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-3xl font-semibold tracking-tight">Progress</h1>
+        <p className="measure mt-2 text-sm text-muted-foreground">
           How your learning sessions resolve. These reflect evidence coverage, not a truth score.
         </p>
       </div>

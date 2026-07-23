@@ -46,8 +46,8 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto h-full w-full max-w-2xl space-y-4 overflow-y-auto scroll-slim p-5 md:p-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Personal preferences, stored locally.</p>
+        <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Personal preferences, stored locally.</p>
       </div>
 
       <Card>

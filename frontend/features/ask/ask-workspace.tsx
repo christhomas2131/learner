@@ -154,8 +154,8 @@ export function AskWorkspace({
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-5 md:p-8">
           {!showRun && (
             <div className="pt-4">
-              <h1 className="text-2xl font-semibold tracking-tight">Ask with confidence</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <h1 className="text-3xl font-semibold tracking-tight">Ask with confidence</h1>
+              <p className="measure mt-2 text-sm text-muted-foreground">
                 Answers come only from your approved materials. Every claim is checked against a
                 cited quotation, and the system abstains when the evidence isn&apos;t there.
               </p>
@@ -167,7 +167,7 @@ export function AskWorkspace({
 
           {!showRun && suggestions && suggestions.length > 0 && (
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium text-muted-foreground">Try asking</p>
+              <p className="eyebrow text-muted-foreground">Try asking</p>
               <div className="flex flex-wrap gap-2">
                 {suggestions.map((s) => (
                   <button
@@ -221,7 +221,7 @@ export function AskWorkspace({
         <>
           <aside
             className={cn(
-              "hidden shrink-0 border-l border-border bg-subtle transition-[width] lg:block",
+              "hidden shrink-0 border-l border-border bg-subtle lg:block",
               panelOpen ? "w-[420px]" : "w-0 overflow-hidden",
             )}
           >
