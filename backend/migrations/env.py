@@ -38,7 +38,9 @@ def do_run_migrations(connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        render_as_batch=True,  # required for SQLite ALTER support
+        # Batch mode is a SQLite workaround for limited ALTER; Postgres uses
+        # native DDL.
+        render_as_batch=connection.dialect.name == "sqlite",
     )
     with context.begin_transaction():
         context.run_migrations()

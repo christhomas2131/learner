@@ -13,16 +13,17 @@ from app.providers.base import ModelProvider
 from app.providers.factory import get_provider
 from app.retrieval.base import Retriever
 from app.retrieval.embeddings import get_embedder
-from app.retrieval.fts import SqliteFtsRetriever
+from app.retrieval.factory import make_fts_retriever
 from app.retrieval.hybrid import HybridRetriever
 from app.services.records import load_resolver_records
 
 
 def _build_retriever(session: AsyncSession) -> Retriever:
     # Hybrid (semantic + lexical) when embeddings are available; else FTS-only.
+    # The lexical backend (SQLite FTS5 / Postgres tsvector) is chosen by dialect.
     if settings.RETRIEVAL_USE_EMBEDDINGS and get_embedder().available:
         return HybridRetriever(session, min_score=settings.RETRIEVAL_MIN_SCORE, rrf_k=settings.RRF_K)
-    return SqliteFtsRetriever(session, min_score=settings.RETRIEVAL_MIN_SCORE)
+    return make_fts_retriever(session, min_score=settings.RETRIEVAL_MIN_SCORE)
 
 
 async def build_pipeline(

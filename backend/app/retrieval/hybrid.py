@@ -16,7 +16,7 @@ from app.core.enums import SourceState
 from app.models import PassageVector, Source, SourcePassage
 from app.retrieval.base import Retriever
 from app.retrieval.embeddings import get_embedder
-from app.retrieval.fts import SqliteFtsRetriever
+from app.retrieval.factory import make_fts_retriever
 from app.schemas.pipeline import RetrievedPassage
 
 
@@ -31,7 +31,7 @@ class HybridRetriever(Retriever):
         self._session = session
         self._min_score = min_score
         self._rrf_k = rrf_k
-        self._fts = SqliteFtsRetriever(session, min_score=0.0)
+        self._fts = make_fts_retriever(session, min_score=0.0)
 
     async def retrieve(
         self, question: str, approved_source_ids: list[str] | None, limit: int

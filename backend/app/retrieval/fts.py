@@ -21,8 +21,14 @@ from app.schemas.pipeline import RetrievedPassage
 _TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
 
 
+def _is_sqlite(session: AsyncSession) -> bool:
+    return session.get_bind().dialect.name == "sqlite"
+
+
 async def ensure_fts(session: AsyncSession) -> None:
-    """Create the FTS5 virtual table if it does not exist."""
+    """Create the FTS5 virtual table if it does not exist (SQLite only)."""
+    if not _is_sqlite(session):
+        return
     await session.execute(
         text(
             "CREATE VIRTUAL TABLE IF NOT EXISTS passage_fts "
@@ -35,7 +41,13 @@ async def ensure_fts(session: AsyncSession) -> None:
 async def index_passages(
     session: AsyncSession, rows: list[tuple[str, str, str]]
 ) -> None:
-    """Insert (passage_id, source_id, text) rows into the FTS index."""
+    """Insert (passage_id, source_id, text) rows into the FTS index.
+
+    SQLite only — Postgres uses a GIN index on to_tsvector, maintained
+    automatically, so this is a no-op there.
+    """
+    if not _is_sqlite(session):
+        return
     await ensure_fts(session)
     for pid, sid, txt in rows:
         await session.execute(
@@ -46,6 +58,8 @@ async def index_passages(
 
 
 async def remove_source_from_index(session: AsyncSession, source_id: str) -> None:
+    if not _is_sqlite(session):
+        return
     await ensure_fts(session)
     await session.execute(
         text("DELETE FROM passage_fts WHERE source_id = :s"), {"s": source_id}

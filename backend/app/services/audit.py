@@ -6,7 +6,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.base import new_uuid, utcnow
+from app.db.base import utcnow
 from app.models import (
     Answer,
     AuditRecord,
@@ -29,8 +29,17 @@ async def persist_result(
     store_message: bool = True,
 ) -> tuple[str, str]:
     """Persist the result. Returns (answer_id, audit_id)."""
+    # An answer must belong to a real session (FK-enforced on Postgres). If the
+    # caller didn't supply one (e.g. the `ask` CLI), create one now.
+    session_id = result.session_id
+    if session_id is None:
+        sess = Session(user_id=user_id, title=(result.question[:60] or "Session"))
+        session.add(sess)
+        await session.flush()
+        session_id = sess.id
+
     answer = Answer(
-        session_id=result.session_id or new_uuid(),
+        session_id=session_id,
         request_id=result.request_id,
         question=result.question,
         status=result.status,
@@ -63,7 +72,7 @@ async def persist_result(
 
     audit = AuditRecord(
         request_id=result.request_id, user_id=user_id,
-        session_id=result.session_id, answer_id=answer.id,
+        session_id=session_id, answer_id=answer.id,
         question=result.question, status=result.status, provider=result.provider,
         snapshot=_snapshot(result),
     )
@@ -71,9 +80,8 @@ async def persist_result(
     await session.flush()
     answer.audit_id = audit.id
 
-    if store_message and result.session_id:
-        session.add(Message(session_id=result.session_id, role="assistant",
-                            content=result.answer))
+    if store_message:
+        session.add(Message(session_id=session_id, role="assistant", content=result.answer))
 
     await session.commit()
     return answer.id, audit.id

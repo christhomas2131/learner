@@ -190,8 +190,10 @@ alembic upgrade head                          # apply migrations
 alembic revision --autogenerate -m "message"  # new migration
 ```
 
-Retrieval is **SQLite FTS5**. A Postgres retriever is a documented future seam
-(the `Retriever` abstraction) — not yet implemented.
+Retrieval works on **both** backends, chosen by DB dialect: **SQLite FTS5**
+locally, **Postgres `tsvector`/`ts_rank`** (GIN-indexed) for `DATABASE_URL`
+pointing at Postgres (`pip install -e ".[postgres]"` for the async driver).
+Semantic vectors are DB-agnostic, so hybrid retrieval works on both.
 
 ---
 
@@ -248,6 +250,5 @@ metadata (request/audit IDs, timing) — never prompts, keys, or model reasoning
 - Grounded contradiction detection is a conservative negation heuristic; subtle
   semantic conflicts need Premium (the model verifier).
 - Grounded answers are extractive, not fluent.
-- Postgres retrieval not implemented (SQLite FTS5 only).
 - Single-user, no authentication (personal local deployment by design).
 - Docker artifacts unverified in this environment.
