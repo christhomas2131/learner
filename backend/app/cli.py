@@ -78,6 +78,14 @@ def main() -> None:
     ask.add_argument("question")
     ask.add_argument("--provider", choices=[k.value for k in ModelProviderKind], default=None)
 
+    sub.add_parser("worker-list", help="List pending premium (Claude Code) questions")
+    wp = sub.add_parser("worker-prep", help="Claim + retrieve for a premium question")
+    wp.add_argument("item_id")
+    wf = sub.add_parser("worker-finish", help="Finish a premium question with draft+verify JSON")
+    wf.add_argument("item_id")
+    wf.add_argument("draft_json")
+    wf.add_argument("verify_json")
+
     args = parser.parse_args()
     if args.command == "initdb":
         asyncio.run(_cmd_initdb())
@@ -85,6 +93,18 @@ def main() -> None:
         asyncio.run(_cmd_seed())
     elif args.command == "ask":
         asyncio.run(_cmd_ask(args.question, args.provider))
+    elif args.command == "worker-list":
+        from app.worker import worker_list
+
+        asyncio.run(worker_list())
+    elif args.command == "worker-prep":
+        from app.worker import worker_prep
+
+        asyncio.run(worker_prep(args.item_id))
+    elif args.command == "worker-finish":
+        from app.worker import worker_finish
+
+        asyncio.run(worker_finish(args.item_id, args.draft_json, args.verify_json))
 
 
 if __name__ == "__main__":
