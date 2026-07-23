@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import uuid
 from contextlib import asynccontextmanager
 
@@ -14,6 +16,8 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
 from app.db.init_db import create_all
+from app.providers.claude_cli import claude_cli_available
+from app.services.premium_drainer import run_drainer
 
 log = get_logger("main")
 
@@ -42,8 +46,21 @@ async def lifespan(app: FastAPI):  # noqa: ANN001
     # Convenience for local/SQLite; production uses Alembic migrations.
     if settings.is_sqlite:
         await create_all()
-    log.info("startup", provider=settings.MODEL_PROVIDER.value, env=settings.APP_ENV)
+
+    # Hands-off premium: auto-drain the premium queue via `claude -p` when the
+    # CLI is present. No terminal, no API key. Falls back to the manual worker.
+    stop = asyncio.Event()
+    drainer_task: asyncio.Task | None = None
+    autodrain = settings.PREMIUM_AUTODRAIN and claude_cli_available()
+    if autodrain:
+        drainer_task = asyncio.create_task(run_drainer(settings.PREMIUM_DRAIN_INTERVAL, stop))
+    log.info("startup", provider=settings.MODEL_PROVIDER.value, env=settings.APP_ENV,
+             premium_autodrain=autodrain)
     yield
+    stop.set()
+    if drainer_task is not None:
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(drainer_task, timeout=5)
 
 
 def create_app() -> FastAPI:

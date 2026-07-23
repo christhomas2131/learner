@@ -126,26 +126,28 @@ python -m app.cli ask "Who won the 2050 World Cup?"  # abstains → INSUFFICIENT
 
 ## Premium answers via your Claude subscription (no API key)
 
-Premium answers are produced by a **Claude Code worker** — you, driving Claude
-Code — not by the API. When you ask a Premium question in the UI it is enqueued;
-a Claude Code session drains the queue:
+Premium answers are drafted and verified by Claude Code — **powered by your
+subscription, no API key**. There are two ways it runs:
+
+**Hands-off (default).** If the `claude` CLI is installed and logged in, the API
+auto-drains the premium queue in-process via headless `claude -p`. Just pick
+**Premium** in the UI and ask — the worker badge shows online and the answer
+appears on its own. Nothing to run. (Toggle with `PREMIUM_AUTODRAIN`.)
+
+**Manual worker** (fallback / no CLI, or to drive drafting yourself):
 
 ```bash
 cd backend && source .venv/bin/activate
-
-python -m app.cli worker-list                 # see pending premium questions
-python -m app.cli worker-prep <queue_id>      # retrieves passages, prints the draft prompt
-# (as the model) write draft.json and verify.json following the printed prompts
+python -m app.cli worker-serve                 # keep-alive loop: heartbeat + auto-answer
+# — or step through one item —
+python -m app.cli worker-prep <queue_id>       # retrieves passages, prints the draft prompt
 python -m app.cli worker-finish <queue_id> draft.json verify.json
 ```
 
-`worker-finish` runs the identical pipeline with your JSON as the model output —
-the harness still validates every quotation and gates release, then the answer
-appears in the web UI. Deterministically-resolvable questions are finished by
-`worker-prep` immediately.
-
-> An Anthropic API key path (`MODEL_PROVIDER=anthropic`) is scaffolded but
-> disabled by default; the subscription/worker path needs no key.
+Either way the identical harness validates every quotation and applies the
+release gate. The `claude -p` path uses your subscription login (non-`--bare`
+mode); no `ANTHROPIC_API_KEY` is set. A key-based path
+(`MODEL_PROVIDER=anthropic`) is scaffolded but disabled by default.
 
 ---
 

@@ -30,6 +30,8 @@ from app.pipeline.resolvers import (
     resolve_computational,
 )
 from app.prompts.drafting import build_draft_prompt
+from app.providers.base import ModelProvider
+from app.providers.claude_cli import ClaudeCliProvider, claude_cli_available
 from app.providers.claude_code import ClaudeCodeProvider
 from app.retrieval.fts import SqliteFtsRetriever
 from app.schemas.pipeline import DraftResponse, VerifierResult
@@ -50,9 +52,15 @@ async def _is_deterministic(session, user_id: str, question: str) -> bool:
     )
 
 
+def _worker_provider() -> ModelProvider:
+    # Prefer the hands-off CLI provider (drafts via `claude -p`); otherwise the
+    # unattached provider (deterministic questions only).
+    return ClaudeCliProvider() if claude_cli_available() else ClaudeCodeProvider()
+
+
 async def _finish(session, user: User, item: QuestionQueue, question: str) -> str:
-    """Run the pipeline for `item` (deterministic or abstain) and mark it DONE."""
-    pipeline = await build_pipeline(session, user.id, provider=ClaudeCodeProvider())
+    """Run the pipeline for `item` and mark it DONE."""
+    pipeline = await build_pipeline(session, user.id, provider=_worker_provider())
     result = await pipeline.run(
         request_id=item.request_id, question=question, session_id=item.session_id,
         approved_source_ids=item.approved_source_ids,
@@ -161,9 +169,12 @@ async def worker_serve(interval: int = 10) -> None:
         async with AsyncSessionLocal() as s:
             user = await get_or_create_demo_user(s)
             items, _ = await queue_svc.list_items(s, user, QueueStatus.PENDING, limit=100)
+            has_cli = claude_cli_available()
             for item in items:
                 question = " ".join(item.question.split())
-                if await _is_deterministic(s, user.id, question):
+                # With the CLI, draft anything hands-off; otherwise only finish
+                # deterministically-resolvable items and report the rest.
+                if has_cli or await _is_deterministic(s, user.id, question):
                     status = await _finish(s, user, item, question)
                     print(f"[worker] auto-resolved {item.id} -> {status}")
                 else:

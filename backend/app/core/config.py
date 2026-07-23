@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # reports "online" if it was touched within this many seconds.
     WORKER_HEARTBEAT_TTL: int = 45
 
+    # When true (and the `claude` CLI is installed), the API auto-drains premium
+    # questions in-process via `claude -p` — hands-off, no terminal, no API key.
+    PREMIUM_AUTODRAIN: bool = True
+    PREMIUM_DRAIN_INTERVAL: int = 3
+
     @property
     def heartbeat_path(self) -> Path:
         return BACKEND_DIR / ".worker_heartbeat"
