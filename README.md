@@ -69,9 +69,11 @@ frontend/  Next.js (App Router) + Tailwind + the answer workspace
   evidence available to it.** No AI system can guarantee universal truth.
 - **Incomplete or incorrect approved sources can still produce incomplete or
   incorrect conclusions.** Learner therefore abstains aggressively.
-- **Contradiction detection** requires the verifier (Premium mode). In Grounded
-  (no-model) mode, conflicting approved sources are quoted extractively and the
-  conflict is **not** auto-flagged — a documented limitation.
+- **Contradiction detection** works in Grounded (no-model) mode via a
+  conservative deterministic detector: a claim is flagged when a *different*
+  approved source negates it with enough shared content. Subtler semantic
+  conflicts (e.g. "dwarf planet" vs "planet" without an explicit negation) are
+  caught by the model verifier in Premium mode.
 - Grounded answers are **extractive** (stitched exact quotes); they may read
   bluntly and occasionally include source formatting.
 
@@ -241,7 +243,8 @@ metadata (request/audit IDs, timing) — never prompts, keys, or model reasoning
 
 ## Known limitations
 
-- No-model contradiction detection (see guarantees above).
+- Grounded contradiction detection is a conservative negation heuristic; subtle
+  semantic conflicts need Premium (the model verifier).
 - Grounded answers are extractive, not fluent.
 - Postgres retrieval not implemented (SQLite FTS5 only).
 - Single-user, no authentication (personal local deployment by design).

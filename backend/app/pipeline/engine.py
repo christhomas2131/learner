@@ -20,6 +20,7 @@ from app.core.enums import (
 )
 from app.core.logging import get_logger
 from app.pipeline import gate
+from app.pipeline.contradiction import find_contradiction
 from app.pipeline.events import (
     CLAIM_VERIFICATION,
     COMPLETED,
@@ -232,6 +233,9 @@ class VerifiedLearningPipeline:
                 completed.append(PipelineStage.VERIFY_CLAIMS)
 
             claim_states = self._resolve_claim_states(draft.claims, verifier_results, passage_by_id)
+            # Stage 6: contradiction analysis — cross-source disagreement in the
+            # approved evidence upgrades a supported claim to CONTRADICTED.
+            self._flag_contradictions(claim_states, passages)
             for cs in claim_states:
                 await emit(
                     PipelineEvent(CLAIM_VERIFICATION, PipelineStage.VERIFY_CLAIMS,
@@ -433,6 +437,23 @@ class VerifiedLearningPipeline:
                 )
             )
         return states
+
+    def _flag_contradictions(
+        self, claim_states: list[_ClaimState], passages: list[RetrievedPassage]
+    ) -> None:
+        for cs in claim_states:
+            if cs.status != ClaimStatus.SUPPORTED:
+                continue
+            source_ids = {e.source_id for e in cs.evidence}
+            hit = find_contradiction(cs.text, source_ids, passages)
+            if hit is not None:
+                cs.status = ClaimStatus.CONTRADICTED
+                cs.evidence = cs.evidence + [
+                    EvidenceOut(
+                        source_id=hit.source_id, passage_id=hit.passage_id,
+                        quotation=hit.quotation, retrieval_score=hit.retrieval_score,
+                    )
+                ]
 
     def _apply_gate(
         self,

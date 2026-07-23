@@ -10,7 +10,7 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, String, TypeDecorator
+from sqlalchemy import DateTime, String, TypeDecorator, event
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -22,6 +22,16 @@ from app.core.config import settings
 
 engine = create_async_engine(settings.DATABASE_URL, future=True)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+if settings.is_sqlite:
+    # WAL + a busy timeout so the API server and the Claude Code worker can share
+    # the SQLite file without "database is locked" errors.
+    @event.listens_for(engine.sync_engine, "connect")
+    def _sqlite_pragmas(dbapi_conn, _record):  # noqa: ANN001
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA busy_timeout=5000")
+        cur.close()
 
 
 def utcnow() -> datetime:
