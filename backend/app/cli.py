@@ -15,9 +15,7 @@ from app.core.enums import ModelProviderKind
 from app.db.base import AsyncSessionLocal, new_uuid
 from app.db.init_db import create_all
 from app.providers.factory import get_provider
-from app.retrieval.fts import SqliteFtsRetriever
 from app.services.audit import persist_result, to_response
-from app.services.records import load_resolver_records
 from app.services.user import get_or_create_demo_user
 
 
@@ -41,17 +39,9 @@ async def _cmd_ask(question: str, provider_kind: str | None) -> None:
     kind = ModelProviderKind(provider_kind) if provider_kind else settings.MODEL_PROVIDER
     async with AsyncSessionLocal() as session:
         user = await get_or_create_demo_user(session)
-        retriever = SqliteFtsRetriever(session, min_score=settings.RETRIEVAL_MIN_SCORE)
-        definitions, answer_keys = await load_resolver_records(session, user.id)
-        from app.pipeline.engine import VerifiedLearningPipeline
+        from app.services.pipeline_runner import build_pipeline
 
-        pipeline = VerifiedLearningPipeline(
-            retriever, get_provider(kind),
-            retrieval_limit=settings.RETRIEVAL_LIMIT,
-            max_model_retries=settings.MAX_MODEL_RETRIES,
-            max_pipeline_attempts=settings.MAX_PIPELINE_ATTEMPTS,
-            definition_records=definitions, answer_key_records=answer_keys,
-        )
+        pipeline = await build_pipeline(session, user.id, provider=get_provider(kind))
         result = await pipeline.run(request_id=new_uuid(), question=question)
         answer_id, audit_id = await persist_result(session, user_id=user.id, result=result)
         resp = to_response(result, audit_id=audit_id)

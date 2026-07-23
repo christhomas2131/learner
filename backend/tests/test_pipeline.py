@@ -7,8 +7,6 @@ timeout, model error, no-sources abstain, and deterministic-avoids-model.
 
 from __future__ import annotations
 
-import pytest
-
 from app.core.enums import TopLevelStatus
 from app.pipeline.engine import VerifiedLearningPipeline
 from app.providers import mock as mk

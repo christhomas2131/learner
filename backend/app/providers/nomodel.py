@@ -33,24 +33,29 @@ class NoModelProvider(ModelProvider):
         passages: list[RetrievedPassage],
         previous_unsupported: list[str] | None = None,
     ) -> DraftResponse:
-        selected = passages[: self._max_claims]
+        # Scan ALL retrieved passages (not just the first few) and assert a claim
+        # only when a passage shares topical content with the question. This keeps
+        # grounded answers conservative even if a hybrid retriever reorders the
+        # pool so that a lexical match sits below a semantic-only one.
         claims: list[DraftClaim] = []
         answer_parts: list[str] = []
-        for i, p in enumerate(selected, start=1):
+        n = 0
+        for p in passages:
+            if len(claims) >= self._max_claims:
+                break
             sentence = best_sentence(p.text, question).strip()
-            # Only assert a claim when the passage actually shares topical
-            # content with the question. Otherwise emit nothing -> gate abstains.
             if not sentence or sentence_relevance(p.text, question) < 1:
                 continue
+            n += 1
             claims.append(
                 DraftClaim(
-                    claim_id=f"claim-{i}",
+                    claim_id=f"claim-{n}",
                     text=sentence,
                     material=True,
                     cited_passage_ids=[p.passage_id],
                 )
             )
-            answer_parts.append(f"{sentence} [{i}]")
+            answer_parts.append(f"{sentence} [{n}]")
         answer = " ".join(answer_parts)
         return DraftResponse(answer=answer, claims=claims)
 

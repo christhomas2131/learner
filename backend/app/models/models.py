@@ -132,6 +132,19 @@ class SourcePassage(Base, TimestampMixin):
 Index("ix_passage_source_chunk", SourcePassage.source_id, SourcePassage.chunk_index)
 
 
+class PassageVector(Base, TimestampMixin):
+    """Semantic embedding for a passage (JSON float list; personal-scale brute force)."""
+
+    __tablename__ = "passage_vectors"
+
+    passage_id: Mapped[str] = mapped_column(
+        GUID, ForeignKey("source_passages.id"), primary_key=True
+    )
+    source_id: Mapped[str] = mapped_column(GUID, index=True)
+    dim: Mapped[int] = mapped_column(Integer, default=0)
+    vector: Mapped[list[float]] = mapped_column(JSON, default=list)
+
+
 class Session(Base, TimestampMixin):
     __tablename__ = "sessions"
 

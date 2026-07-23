@@ -14,6 +14,9 @@ _TMP = tempfile.mkdtemp(prefix="learner-tests-")
 os.environ.setdefault("DATABASE_URL", f"sqlite+aiosqlite:///{_TMP}/test.db")
 os.environ.setdefault("UPLOAD_DIRECTORY", f"{_TMP}/uploads")
 os.environ.setdefault("MODEL_PROVIDER", "none")
+# Keep tests hermetic + fast: no embedding-model download. Hybrid tests opt in
+# via a fake embedder.
+os.environ.setdefault("RETRIEVAL_USE_EMBEDDINGS", "false")
 
 import pytest  # noqa: E402
 

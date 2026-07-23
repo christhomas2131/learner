@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -18,8 +18,21 @@ from app.core.enums import SourceState, SourceType
 from app.core.security import content_hash, sanitize_filename, source_type_for_extension
 from app.ingestion.chunk import chunk_text
 from app.ingestion.extract import ExtractionError, extract_text
-from app.models import IngestionJob, Source, SourcePassage
+from app.models import IngestionJob, PassageVector, Source, SourcePassage
+from app.retrieval.embeddings import get_embedder
 from app.retrieval.fts import index_passages, remove_source_from_index
+
+
+async def _index_vectors(session: AsyncSession, rows: list[tuple[str, str, str]]) -> None:
+    """Embed passages and store vectors (no-op if embeddings unavailable)."""
+    embedder = get_embedder()
+    if not embedder.available or not rows:
+        return
+    vectors = embedder.embed([text for _, _, text in rows])
+    if not vectors:
+        return
+    for (pid, sid, _text), vec in zip(rows, vectors, strict=False):
+        session.add(PassageVector(passage_id=pid, source_id=sid, dim=len(vec), vector=vec))
 
 
 class IngestionError(Exception):
@@ -98,7 +111,9 @@ async def ingest_file(
     await session.flush()
 
     passages = await _create_passages(session, source, text)
-    await index_passages(session, [(p.id, source.id, p.text) for p in passages])
+    fts_rows = [(p.id, source.id, p.text) for p in passages]
+    await index_passages(session, fts_rows)
+    await _index_vectors(session, fts_rows)
 
     session.add(IngestionJob(source_id=source.id, state="DONE", passage_count=len(passages)))
     source.state = SourceState.PENDING_APPROVAL
@@ -160,6 +175,7 @@ async def ingest_structured(
     # Assign a fresh dict so SQLAlchemy persists the change (JSON is not mutable-tracked).
     source.structured_data = {"records": records_out, "kind": source_type.value}
     await index_passages(session, fts_rows)
+    await _index_vectors(session, fts_rows)
     session.add(IngestionJob(source_id=source.id, state="DONE", passage_count=len(passages)))
     source.state = SourceState.PENDING_APPROVAL
     await session.commit()
@@ -190,12 +206,15 @@ async def set_source_state(session: AsyncSession, source: Source, state: SourceS
 
 
 async def reindex_source(session: AsyncSession, source: Source) -> int:
-    """Rebuild the FTS entries for a source from its stored passages."""
+    """Rebuild the FTS + vector entries for a source from its stored passages."""
     await remove_source_from_index(session, source.id)
+    await session.execute(delete(PassageVector).where(PassageVector.source_id == source.id))
     rows = (
         await session.execute(
             select(SourcePassage).where(SourcePassage.source_id == source.id)
         )
     ).scalars().all()
-    await index_passages(session, [(p.id, source.id, p.text) for p in rows])
+    fts_rows = [(p.id, source.id, p.text) for p in rows]
+    await index_passages(session, fts_rows)
+    await _index_vectors(session, fts_rows)
     return len(rows)

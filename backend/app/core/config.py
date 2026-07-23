@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     RETRIEVAL_LIMIT: int = 8
     RETRIEVAL_MIN_SCORE: float = 0.0  # FTS bm25 rank; 0 = accept any match
 
+    # Semantic retrieval: local keyless embeddings (fastembed/ONNX) fused with
+    # FTS via reciprocal rank fusion. Degrades to FTS-only if the model can't load.
+    RETRIEVAL_USE_EMBEDDINGS: bool = True
+    EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
+    RRF_K: int = 60
+
     CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     LOG_LEVEL: str = "INFO"
 
