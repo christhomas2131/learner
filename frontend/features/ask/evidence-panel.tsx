@@ -1,12 +1,20 @@
 "use client";
 
 import * as React from "react";
+import { BookOpenText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/misc";
+import { SourceViewer } from "@/features/ask/source-viewer";
 import type { AnswerResponse, ClaimOut } from "@/lib/api/schemas";
+
+interface ViewerTarget {
+  sourceId: string;
+  title?: string;
+  quotation: string;
+}
 
 export function EvidencePanel({
   answer,
@@ -20,6 +28,11 @@ export function EvidencePanel({
   onTabChange: (t: string) => void;
 }) {
   const claimRefs = React.useRef<Record<string, HTMLDivElement | null>>({});
+  const [viewer, setViewer] = React.useState<ViewerTarget | null>(null);
+  const titleFor = (sid: string) =>
+    answer.sources.find((s) => s.source_id === sid)?.title;
+  const onView = (sourceId: string, quotation: string) =>
+    setViewer({ sourceId, quotation, title: titleFor(sourceId) });
 
   const highlightedClaimId = React.useMemo(() => {
     if (selectedCitation == null) return null;
@@ -39,6 +52,7 @@ export function EvidencePanel({
   const contradictions = answer.claims.filter((c) => c.status === "CONTRADICTED");
 
   return (
+    <>
     <Tabs value={tab} onValueChange={onTabChange} className="flex h-full flex-col">
       <div className="border-b border-border p-3">
         <TabsList className="w-full justify-between">
@@ -81,6 +95,7 @@ export function EvidencePanel({
               <ClaimCard
                 key={c.claim_id}
                 claim={c}
+                onView={onView}
                 highlighted={c.claim_id === highlightedClaimId}
                 ref={(el) => {
                   claimRefs.current[c.claim_id] = el;
@@ -100,7 +115,7 @@ export function EvidencePanel({
                   </div>
                 )}
                 {contradictions.map((c) => (
-                  <ClaimCard key={c.claim_id} claim={c} />
+                  <ClaimCard key={c.claim_id} claim={c} onView={onView} />
                 ))}
               </>
             )}
@@ -135,13 +150,21 @@ export function EvidencePanel({
         </div>
       </ScrollArea>
     </Tabs>
+    <SourceViewer
+      sourceId={viewer?.sourceId ?? null}
+      sourceTitle={viewer?.title}
+      quotation={viewer?.quotation}
+      open={!!viewer}
+      onOpenChange={(o) => !o && setViewer(null)}
+    />
+    </>
   );
 }
 
 const ClaimCard = React.forwardRef<
   HTMLDivElement,
-  { claim: ClaimOut; highlighted?: boolean }
->(({ claim, highlighted }, ref) => (
+  { claim: ClaimOut; highlighted?: boolean; onView?: (sourceId: string, quotation: string) => void }
+>(({ claim, highlighted, onView }, ref) => (
   <div
     ref={ref}
     className={cn(
@@ -162,8 +185,16 @@ const ClaimCard = React.forwardRef<
         className="mt-2 border-l-2 border-primary/40 bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground"
       >
         “{e.quotation}”
-        <span className="mt-1 block text-xs opacity-70">
-          relevance {e.retrieval_score.toFixed(2)}
+        <span className="mt-1 flex items-center justify-between text-xs opacity-70">
+          <span>relevance {e.retrieval_score.toFixed(2)}</span>
+          {onView && (
+            <button
+              onClick={() => onView(e.source_id, e.quotation)}
+              className="inline-flex items-center gap-1 text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <BookOpenText className="size-3" /> view in source
+            </button>
+          )}
         </span>
       </blockquote>
     ))}
