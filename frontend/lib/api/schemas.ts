@@ -7,6 +7,9 @@ export const topLevelStatus = z.enum([
   "INSUFFICIENT_EVIDENCE",
   "CONTRADICTION",
   "ERROR",
+  // Response-only: auto-discovery offered candidate web sources for an
+  // abstention. Never persisted (the stored Answer keeps INSUFFICIENT_EVIDENCE).
+  "NEEDS_SOURCES",
 ]);
 export type TopLevelStatus = z.infer<typeof topLevelStatus>;
 
@@ -76,6 +79,14 @@ export const pipelineInfo = z.object({
   model_identifier: z.string().nullable().optional(),
 });
 
+export const candidateOut = z.object({
+  url: z.string(),
+  title: z.string(),
+  snippet: z.string(),
+  providers: z.array(z.string()),
+});
+export type CandidateOut = z.infer<typeof candidateOut>;
+
 export const answerResponse = z.object({
   request_id: z.string(),
   audit_id: z.string().nullable(),
@@ -87,6 +98,9 @@ export const answerResponse = z.object({
   sources: z.array(sourceRef),
   pipeline: pipelineInfo,
   contradiction_detail: z.string().nullable().optional(),
+  // Present only when status === NEEDS_SOURCES (auto-discovery candidates).
+  candidates: z.array(candidateOut).optional(),
+  discovery_id: z.string().nullable().optional(),
   created_at: z.string(),
 });
 export type AnswerResponse = z.infer<typeof answerResponse>;

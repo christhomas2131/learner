@@ -14,6 +14,7 @@ import { streamAnswer, streamQueueEvents, type SseEvent } from "@/lib/api/sse";
 import { Composer, type AskMode } from "@/features/ask/composer";
 import { PipelineProgress } from "@/features/ask/pipeline-progress";
 import { AnswerView } from "@/features/ask/answer-view";
+import { DiscoveryPanel } from "@/features/ask/discovery-panel";
 import { EvidencePanel } from "@/features/ask/evidence-panel";
 
 interface RunState {
@@ -23,6 +24,7 @@ interface RunState {
   activeStage: string | null;
   lastMessage: string;
   streaming: boolean;
+  discovering: boolean;
   answer: AnswerResponse | null;
   queueId: string | null;
   error: string | null;
@@ -35,6 +37,7 @@ const INITIAL: RunState = {
   activeStage: null,
   lastMessage: "",
   streaming: false,
+  discovering: false,
   answer: null,
   queueId: null,
   error: null,
@@ -94,6 +97,12 @@ export function AskWorkspace({
           activeStage = String(data.stage);
           reached.add(activeStage);
           lastMessage = String(data.message ?? "");
+        } else if (ev.event === "discovering") {
+          // Abstained with discovery on: searching the web for candidate sources.
+          return {
+            ...r, discovering: true, activeStage: null,
+            lastMessage: "Searching the web for candidate sources…",
+          };
         } else if (
           ["source_retrieved", "draft_created", "claim_verification", "revision_started",
             "release_gate"].includes(ev.event)
@@ -102,12 +111,12 @@ export function AskWorkspace({
         } else if (ev.event === "completed") {
           const parsed = answerResponse.safeParse(ev.data);
           return {
-            ...r, streaming: false, activeStage: null,
+            ...r, streaming: false, discovering: false, activeStage: null,
             answer: parsed.success ? parsed.data : r.answer,
             error: parsed.success ? null : "Malformed response from server.",
           };
         } else if (ev.event === "failed") {
-          return { ...r, streaming: false, error: String(data.message ?? "Failed") };
+          return { ...r, streaming: false, discovering: false, error: String(data.message ?? "Failed") };
         }
         return { ...r, reached, activeStage, lastMessage };
       });
@@ -128,7 +137,7 @@ export function AskWorkspace({
       }
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
-        setRun((r) => ({ ...r, streaming: false, error: (e as Error).message }));
+        setRun((r) => ({ ...r, streaming: false, discovering: false, error: (e as Error).message }));
         toast.error("Could not reach the backend.");
       }
     } finally {
@@ -138,7 +147,7 @@ export function AskWorkspace({
 
   function cancel() {
     abortRef.current?.abort();
-    setRun((r) => ({ ...r, streaming: false, queueId: null, activeStage: null }));
+    setRun((r) => ({ ...r, streaming: false, discovering: false, queueId: null, activeStage: null }));
   }
 
   function onCite(n: number) {
@@ -149,6 +158,10 @@ export function AskWorkspace({
   }
 
   const showRun = run.streaming || run.answer || run.error;
+  const needsSources = run.answer?.status === "NEEDS_SOURCES";
+  // The evidence aside is meaningful only for a real verdict — a NEEDS_SOURCES
+  // result has no claims/sources yet (the DiscoveryPanel takes over instead).
+  const evidenceReady = !!run.answer && !needsSources;
   // "Waiting for a worker" only until the first live pipeline event arrives;
   // then the normal pipeline progress takes over.
   const waitingPremium = !!run.queueId && !run.answer && !run.error && run.reached.size === 0;
@@ -211,10 +224,17 @@ export function AskWorkspace({
               <span>{run.lastMessage}</span>
             </div>
           ) : (
-            run.streaming && (
+            run.streaming && !run.discovering && (
               <PipelineProgress reached={run.reached} activeStage={run.activeStage}
                 done={false} lastMessage={run.lastMessage} mode={run.mode} />
             )
+          )}
+
+          {run.discovering && (
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm">
+              <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
+              <span>Searching the web for candidate sources…</span>
+            </div>
           )}
 
           {run.error && (
@@ -248,7 +268,20 @@ export function AskWorkspace({
             </div>
           )}
 
-          {run.answer && !run.streaming && (
+          {run.answer && !run.streaming && needsSources && (
+            <DiscoveryPanel
+              question={run.answer.question}
+              sessionId={sessionId ?? run.answer.session_id}
+              discoveryId={run.answer.discovery_id ?? null}
+              candidates={run.answer.candidates ?? []}
+              onAnswer={(answer) => {
+                setRun((r) => ({ ...r, answer }));
+                qc.invalidateQueries({ queryKey: ["sessions"] });
+              }}
+            />
+          )}
+
+          {run.answer && !run.streaming && !needsSources && (
             <AnswerView answer={run.answer} onCite={onCite}
               onRetry={() => ask(run.answer!.question, run.mode)} />
           )}
@@ -256,7 +289,7 @@ export function AskWorkspace({
       </div>
 
       {/* Desktop (lg+): fixed evidence aside + toggle. */}
-      {run.answer && (
+      {evidenceReady && (
         <>
           <aside
             className={cn(
@@ -265,7 +298,7 @@ export function AskWorkspace({
             )}
           >
             {panelOpen && (
-              <EvidencePanel answer={run.answer} selectedCitation={selectedCitation}
+              <EvidencePanel answer={run.answer!} selectedCitation={selectedCitation}
                 tab={tab} onTabChange={setTab} />
             )}
           </aside>
@@ -282,7 +315,7 @@ export function AskWorkspace({
       )}
 
       {/* Below lg: evidence opens in a sheet (citations + this button trigger it). */}
-      {run.answer && (
+      {evidenceReady && (
         <Button
           variant="outline"
           size="sm"
@@ -292,7 +325,7 @@ export function AskWorkspace({
           <PanelRightOpen className="size-4" /> Evidence
         </Button>
       )}
-      {run.answer && belowLg && (
+      {evidenceReady && belowLg && (
         <Sheet open={mobileEvidenceOpen} onOpenChange={setMobileEvidenceOpen}>
           <SheetContent className="p-0">
             <SheetTitle className="sr-only">Evidence</SheetTitle>
@@ -300,7 +333,7 @@ export function AskWorkspace({
               Sources, claims, and the audit trace for this answer.
             </SheetDescription>
             <div className="h-full overflow-hidden">
-              <EvidencePanel answer={run.answer} selectedCitation={selectedCitation}
+              <EvidencePanel answer={run.answer!} selectedCitation={selectedCitation}
                 tab={tab} onTabChange={setTab} headerClassName="pr-10" />
             </div>
           </SheetContent>

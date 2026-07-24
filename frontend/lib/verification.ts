@@ -39,6 +39,13 @@ export const TOP_LEVEL_STATUS: Record<TopLevelStatus, StatusStyle> = {
     tone: "error",
     description: "Verification could not complete safely.",
   },
+  NEEDS_SOURCES: {
+    label: "Sources to Review",
+    icon: "help",
+    tone: "insufficient",
+    description:
+      "Not in your approved materials yet — but candidate web sources were found for you to validate. Approve the ones you trust to add them and get a verified answer.",
+  },
 };
 
 export const CLAIM_STATUS: Record<ClaimStatus, StatusStyle> = {
