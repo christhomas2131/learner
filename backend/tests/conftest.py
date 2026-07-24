@@ -17,6 +17,9 @@ os.environ.setdefault("MODEL_PROVIDER", "none")
 # Keep tests hermetic + fast: no embedding-model download. Hybrid tests opt in
 # via a fake embedder.
 os.environ.setdefault("RETRIEVAL_USE_EMBEDDINGS", "false")
+# No network in tests: never auto-discover from the web. Discovery tests opt in
+# by monkeypatching settings.AUTO_DISCOVERY_ENABLED + the discover() call.
+os.environ.setdefault("AUTO_DISCOVERY_ENABLED", "false")
 
 import pytest  # noqa: E402
 

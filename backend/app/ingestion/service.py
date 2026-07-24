@@ -193,6 +193,7 @@ async def ingest_website(
     title: str | None = None,
     subject_id: str | None = None,
     is_demo: bool = False,
+    discovered: bool = False,
 ) -> Source:
     """Fetch, snapshot, and ingest a web page as an APPROVED_WEBSITE source.
 
@@ -217,7 +218,7 @@ async def ingest_website(
         state=SourceState.PROCESSING, is_demo=is_demo, content_hash=digest, url=url,
         subject_id=subject_id, byte_size=len(text.encode()),
         structured_data={"kind": "APPROVED_WEBSITE", "url": url,
-                         "fetched_at": utcnow().isoformat()},
+                         "fetched_at": utcnow().isoformat(), "discovered": discovered},
     )
     session.add(source)
     await session.flush()

@@ -44,6 +44,10 @@ class TopLevelStatus(StrEnum):
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
     CONTRADICTION = "CONTRADICTION"
     ERROR = "ERROR"
+    # Response-only: the deterministic release gate NEVER emits this. The
+    # auto-discovery orchestration sets it when an abstention can be backed by
+    # candidate web sources the user may approve. Never persisted as an Answer.
+    NEEDS_SOURCES = "NEEDS_SOURCES"
 
 
 class PipelineStage(StrEnum):

@@ -4,6 +4,12 @@
 - mode="premium": enqueue for a Claude Code worker; the client polls the queue
   or streams queue status. Premium answers never run inline (there is no model
   in the API process).
+
+Auto-discovery: when a grounded answer abstains (INSUFFICIENT_EVIDENCE) and the
+feature is enabled, the response is upgraded to NEEDS_SOURCES with candidate web
+sources for the user to validate (see app.discovery). This is response-only — the
+persisted Answer keeps its honest INSUFFICIENT_EVIDENCE status; the gate is never
+bypassed.
 """
 
 from __future__ import annotations
@@ -19,10 +25,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_session
 from app.api.errors import NotFoundError
 from app.api.schemas import AskRequest, EnqueueResponse
+from app.core.config import settings
+from app.core.enums import TopLevelStatus
 from app.db.base import AsyncSessionLocal
+from app.discovery.service import discover
 from app.models import User
 from app.pipeline.events import COMPLETED, PipelineEvent
-from app.schemas.api import AnswerResponse
+from app.schemas.api import AnswerResponse, CandidateOut
 from app.services import queue as queue_svc
 from app.services.answering import answer_and_persist
 from app.services.audit import load_answer_response, to_response
@@ -34,6 +43,28 @@ router = APIRouter()
 
 def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def _should_discover(resp: AnswerResponse, skip: bool) -> bool:
+    return (not skip and settings.AUTO_DISCOVERY_ENABLED
+            and resp.status == TopLevelStatus.INSUFFICIENT_EVIDENCE)
+
+
+async def _maybe_discover(resp: AnswerResponse, question: str, skip: bool) -> AnswerResponse:
+    """If the answer abstained and discovery is on, attach candidate web sources
+    and flip the status to NEEDS_SOURCES. Response-only — nothing is persisted,
+    and the deterministic gate's verdict is untouched."""
+    if not _should_discover(resp, skip):
+        return resp
+    discovery_id, candidates = await discover(question)
+    if candidates:
+        resp.status = TopLevelStatus.NEEDS_SOURCES
+        resp.discovery_id = discovery_id
+        resp.candidates = [
+            CandidateOut(url=c.url, title=c.title, snippet=c.snippet, providers=c.providers)
+            for c in candidates
+        ]
+    return resp
 
 
 @router.post("/answers", response_model=AnswerResponse | EnqueueResponse)
@@ -57,7 +88,8 @@ async def create_answer(
         session, user, question=body.question, session_id=body.session_id,
         subject_id=body.subject_id, approved_source_ids=body.approved_source_ids,
     )
-    return to_response(result, audit_id=audit_id)
+    resp = to_response(result, audit_id=audit_id)
+    return await _maybe_discover(resp, body.question, body.skip_discovery)
 
 
 @router.get("/answers/{answer_id}", response_model=AnswerResponse)
@@ -108,6 +140,10 @@ async def stream_answer(
                             approved_source_ids=body.approved_source_ids, emitter=emitter,
                         )
                         resp = to_response(result, audit_id=audit_id)
+                        if _should_discover(resp, body.skip_discovery):
+                            # Surface a "searching the web" state during the wait.
+                            await events.put(("__discovering__", {}))
+                            resp = await _maybe_discover(resp, body.question, body.skip_discovery)
                         await events.put(("__result__", resp.model_dump(mode="json")))
                 except Exception as e:  # noqa: BLE001
                     await events.put(("__failed__", {"message": str(e)}))
@@ -126,6 +162,8 @@ async def stream_answer(
                         yield _sse("completed", payload)
                     elif kind == "__enqueued__":
                         yield _sse("queued", payload)
+                    elif kind == "__discovering__":
+                        yield _sse("discovering", payload)
                     elif kind == "__failed__":
                         yield _sse("failed", payload)
                     continue

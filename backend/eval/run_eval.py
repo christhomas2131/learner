@@ -26,6 +26,7 @@ os.environ.setdefault("DATABASE_URL", f"sqlite+aiosqlite:///{_TMP}/eval.db")
 os.environ.setdefault("UPLOAD_DIRECTORY", f"{_TMP}/uploads")
 os.environ.setdefault("MODEL_PROVIDER", "none")
 os.environ.setdefault("RETRIEVAL_USE_EMBEDDINGS", "false")
+os.environ.setdefault("AUTO_DISCOVERY_ENABLED", "false")  # hermetic: no web calls
 
 from app.core.enums import ModelProviderKind  # noqa: E402
 from app.db.base import AsyncSessionLocal, new_uuid  # noqa: E402

@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     analytics,
     answers,
+    discovery,
     health,
     queue,
     sessions,
@@ -16,6 +17,7 @@ from app.api.v1 import (
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(answers.router, tags=["answers"])
+api_router.include_router(discovery.router, tags=["discovery"])
 api_router.include_router(sessions.router, tags=["sessions"])
 api_router.include_router(sources.router, tags=["sources"])
 api_router.include_router(subjects.router, tags=["subjects"])

@@ -55,6 +55,14 @@ class PipelineInfo(BaseModel):
     model_identifier: str | None = None
 
 
+class CandidateOut(BaseModel):
+    """A web source surfaced by auto-discovery, pending user validation."""
+    url: str
+    title: str
+    snippet: str = ""
+    providers: list[str] = Field(default_factory=list)
+
+
 class AnswerResponse(BaseModel):
     request_id: str
     audit_id: str | None
@@ -66,4 +74,7 @@ class AnswerResponse(BaseModel):
     sources: list[SourceOut] = Field(default_factory=list)
     pipeline: PipelineInfo
     contradiction_detail: str | None = None
+    # Populated only when status == NEEDS_SOURCES (auto-discovery offered these).
+    candidates: list[CandidateOut] = Field(default_factory=list)
+    discovery_id: str | None = None
     created_at: datetime

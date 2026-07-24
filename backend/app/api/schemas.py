@@ -30,6 +30,22 @@ class AskRequest(BaseModel):
     subject_id: str | None = None
     approved_source_ids: list[str] | None = None
     mode: AskMode = "grounded"
+    # When True, skip auto source-discovery even on an abstention (e.g. re-asks).
+    skip_discovery: bool = False
+
+
+class ChosenSourceIn(BaseModel):
+    url: str = Field(min_length=4, max_length=2000)
+    title: str | None = None
+
+
+class ConfirmDiscoveryRequest(BaseModel):
+    """Confirm auto-discovered candidates: ingest them and re-run the answer."""
+    question: str = Field(min_length=1, max_length=4000)
+    session_id: str | None = None
+    subject_id: str | None = None
+    discovery_id: str | None = None
+    sources: list[ChosenSourceIn] = Field(min_length=1, max_length=25)
 
 
 # ---- Sessions ---- #

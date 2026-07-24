@@ -61,6 +61,16 @@ class Settings(BaseSettings):
     # Multi-hop: split clearly-compound questions and merge per-part retrieval.
     RETRIEVAL_DECOMPOSE: bool = True
 
+    # Auto source discovery: when a question finds no relevant approved source,
+    # search the web (keyless) for candidates the user validates before they
+    # become approved master data. Forced OFF in tests + eval (hermetic).
+    AUTO_DISCOVERY_ENABLED: bool = True
+    AUTO_DISCOVERY_MAX_CANDIDATES: int = 8
+    AUTO_DISCOVERY_TIMEOUT_SECONDS: int = 12
+    AUTO_DISCOVERY_WIKIPEDIA: bool = True
+    AUTO_DISCOVERY_DUCKDUCKGO: bool = True
+    AUTO_DISCOVERY_CLAUDE_WEB: bool = True
+
     CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     LOG_LEVEL: str = "INFO"
 
