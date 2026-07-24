@@ -28,6 +28,8 @@ jobs:
         run: mypy app || true
       - name: Test
         run: pytest -q
+      - name: Eval (hallucination scorecard)
+        run: python -m eval.run_eval
 
   frontend:
     runs-on: ubuntu-latest

@@ -1,0 +1,21 @@
+[
+  {"question": "What is photosynthesis?", "expect_status": "VERIFIED", "expect_source": "Biology", "note": "glossary/def"},
+  {"question": "Explain photosynthesis in detail", "expect_status": "VERIFIED", "expect_source": "Biology", "note": "single substantive term guard"},
+  {"question": "What are Newton's laws of motion?", "expect_status": "VERIFIED", "expect_source": "Physics", "note": "retrieval"},
+  {"question": "What is water made of?", "expect_status": "VERIFIED", "expect_source": "Chemistry", "note": "retrieval"},
+  {"question": "What is DNA?", "expect_status": "VERIFIED", "expect_source": null, "note": "glossary/genetics"},
+  {"question": "Tell me about Julius Caesar", "expect_status": "VERIFIED", "expect_source": "Rome", "note": "retrieval"},
+  {"question": "How many continents are there?", "expect_status": "VERIFIED", "expect_source": null, "note": "answer key"},
+  {"question": "What year did the Second World War end?", "expect_status": "VERIFIED", "expect_source": null, "note": "answer key"},
+  {"question": "What is 15% of 240?", "expect_status": "VERIFIED", "expect_source": null, "note": "arithmetic resolver"},
+  {"question": "What is photosynthesis and where does cellular respiration occur?", "expect_status": "VERIFIED", "expect_source": null, "note": "multi-hop"},
+  {"question": "Is Pluto a planet?", "expect_status": "CONTRADICTION", "expect_source": null, "note": "seeded conflict"},
+  {"question": "Is the Great Wall of China visible from space?", "expect_status": "CONTRADICTION", "expect_source": null, "note": "seeded conflict"},
+  {"question": "Who won the 2050 World Cup?", "expect_status": "INSUFFICIENT_EVIDENCE", "expect_source": null, "note": "not in corpus"},
+  {"question": "What is the airspeed velocity of an unladen swallow?", "expect_status": "INSUFFICIENT_EVIDENCE", "expect_source": null, "note": "not in corpus"},
+  {"question": "What is the capital of France?", "expect_status": "INSUFFICIENT_EVIDENCE", "expect_source": null, "note": "not in corpus"},
+  {"question": "How do I bake sourdough bread?", "expect_status": "INSUFFICIENT_EVIDENCE", "expect_source": null, "note": "not in corpus"},
+  {"question": "What is the population of the world?", "expect_status": "INSUFFICIENT_EVIDENCE", "expect_source": null, "note": "shares 'world' with WWII doc — relevance guard must reject"},
+  {"question": "Compare photosynthesis and cellular respiration", "expect_status": "VERIFIED", "expect_source": null, "note": "two topics, both in corpus"},
+  {"question": "What is quantum entanglement?", "expect_status": "INSUFFICIENT_EVIDENCE", "expect_source": null, "note": "sciencey but absent — must abstain, not confabulate"}
+]

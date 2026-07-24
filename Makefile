@@ -55,6 +55,9 @@ test-frontend: ## Run frontend unit tests
 test-e2e: ## Run Playwright E2E tests (requires browsers: npx playwright install)
 	cd $(FRONTEND) && npm run test:e2e
 
+eval: ## Hallucination scorecard — gold set → status accuracy + retrieval hit-rate
+	cd $(BACKEND) && .venv/bin/python -m eval.run_eval
+
 lint: ## Lint backend + frontend
 	cd $(BACKEND) && .venv/bin/ruff check app
 	cd $(FRONTEND) && npx eslint .
