@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     MAX_PIPELINE_ATTEMPTS: int = 2
     MODEL_TIMEOUT_SECONDS: int = 60
 
+    # Local Ollama (keyless, offline). Used when MODEL_PROVIDER=ollama.
+    OLLAMA_HOST: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.1"
+
     UPLOAD_DIRECTORY: Path = BACKEND_DIR / "uploads"
     KNOWLEDGE_DIRECTORY: Path = BACKEND_DIR / "knowledge"
     MAX_UPLOAD_SIZE_MB: int = 25

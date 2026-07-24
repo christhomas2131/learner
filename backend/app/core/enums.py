@@ -69,6 +69,7 @@ class QueueStatus(StrEnum):
 class ModelProviderKind(StrEnum):
     NONE = "none"          # deterministic extractive, no model
     CLAUDE_CODE = "claude_code"  # answered by a Claude Code worker session
+    OLLAMA = "ollama"      # local Ollama server (keyless, offline)
     MOCK = "mock"          # fixture-driven, tests only
     ANTHROPIC = "anthropic"  # reserved for future API-key path
 
