@@ -49,9 +49,21 @@ export function AnswerView({
   const isAbstain = answer.status !== "VERIFIED";
 
   return (
-    <article className="rounded-lg border border-border bg-card p-6">
+    <article className="t-reveal rounded-lg border border-border bg-card p-6">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <StatusBadge status={answer.status} />
+        {answer.status === "VERIFIED" ? (
+          <span className="inline-flex items-center gap-2 rounded-md border border-verified/30 bg-verified-subtle px-2.5 py-1 text-sm font-medium text-verified">
+            <span className="t-success-check" data-state="in" aria-hidden>
+              <svg viewBox="0 0 48 48" width="18" height="18" fill="none" stroke="currentColor"
+                strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M13 25l7 7 15-16" />
+              </svg>
+            </span>
+            Verified
+          </span>
+        ) : (
+          <StatusBadge status={answer.status} />
+        )}
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"

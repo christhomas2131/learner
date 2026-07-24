@@ -17,8 +17,11 @@ export const DialogContent = React.forwardRef<
     <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in" />
     <DialogPrimitive.Content
       ref={ref}
+      // Center via the `translate` longhand so the `scale`-based open animation
+      // composes without a transform conflict.
+      style={{ translate: "-50% -50%" }}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-6 shadow-lg focus:outline-none",
+        "t-modal-in fixed left-1/2 top-1/2 z-50 w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-lg focus:outline-none",
         className,
       )}
       {...props}
