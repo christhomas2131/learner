@@ -69,6 +69,9 @@ typecheck: ## Type-check backend (mypy) + frontend (tsc)
 build: ## Production build of the frontend
 	cd $(FRONTEND) && npm run build
 
+desktop: ## Launch the Electron desktop app (spawns backend + frontend in a window)
+	cd desktop && npm install && npm start
+
 clean: ## Remove caches, build output, and local databases
 	rm -rf $(FRONTEND)/.next $(FRONTEND)/node_modules/.cache
 	find $(BACKEND) -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true

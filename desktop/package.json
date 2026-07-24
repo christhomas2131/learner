@@ -1,0 +1,13 @@
+{
+  "name": "learner-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron desktop shell for Learner — launches the local backend + frontend in an app window.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

@@ -197,6 +197,20 @@ Semantic vectors are DB-agnostic, so hybrid retrieval works on both.
 
 ---
 
+## Desktop app
+
+An Electron shell launches the app in a native window (spawns the local backend
++ frontend, opens `http://localhost:3000`):
+
+```bash
+make desktop        # or: cd desktop && npm install && npm start
+```
+
+This is a dev-mode wrapper (requires the backend venv + frontend deps installed).
+Packaging a self-contained, signed `.app`/`.dmg` (PyInstaller for the backend +
+electron-builder) is a documented next step. The Electron window is not
+GUI-verified in the build environment (headless, no display).
+
 ## Docker
 
 > ⚠️ The Docker/Compose files are written but **not run-verified** (Docker was
