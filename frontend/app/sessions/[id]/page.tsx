@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { useParams } from "next/navigation";
-import { Bookmark, BookmarkCheck } from "lucide-react";
+import { Bookmark, BookmarkCheck, Download } from "lucide-react";
 import { useSession, useUpdateSession } from "@/lib/api/hooks";
+import { API_BASE } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -37,14 +38,21 @@ export default function SessionPage() {
           )}
         </div>
         {data && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => update.mutate({ id, saved: !data.saved })}
-          >
-            {data.saved ? <BookmarkCheck className="size-4" /> : <Bookmark className="size-4" />}
-            {data.saved ? "Saved" : "Save"}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" asChild>
+              <a href={`${API_BASE}/api/v1/sessions/${id}/export.docx`} download>
+                <Download className="size-4" /> Export
+              </a>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => update.mutate({ id, saved: !data.saved })}
+            >
+              {data.saved ? <BookmarkCheck className="size-4" /> : <Bookmark className="size-4" />}
+              {data.saved ? "Saved" : "Save"}
+            </Button>
+          </div>
         )}
       </header>
 

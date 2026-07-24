@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import Pagination, get_current_user, get_session, pagination
@@ -71,6 +72,22 @@ async def get_session_detail(
                   for m in messages],
         answers=[AnswerSummary(id=a.id, question=a.question, status=a.status,
                                answer_text=a.answer_text, created_at=a.created_at) for a in answers],
+    )
+
+
+@router.get("/sessions/{session_id}/export.docx")
+async def export_session(
+    session_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    from app.services.export import export_session_docx
+
+    filename, data = await export_session_docx(session, user, session_id)
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
