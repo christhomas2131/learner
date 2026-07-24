@@ -93,6 +93,8 @@ async def stream_queue_events(
                     if terminal:
                         yield terminal
                         break
+                    # Keepalive comment so idle proxies don't cut a long premium wait.
+                    yield ": keepalive\n\n"
         finally:
             hub.unsubscribe(item_id, q)
 

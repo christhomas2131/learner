@@ -66,7 +66,7 @@ format: ## Format backend (ruff)
 	cd $(BACKEND) && .venv/bin/ruff format app
 
 typecheck: ## Type-check backend (mypy) + frontend (tsc)
-	cd $(BACKEND) && .venv/bin/mypy app || true
+	cd $(BACKEND) && .venv/bin/mypy app
 	cd $(FRONTEND) && npx tsc --noEmit
 
 build: ## Production build of the frontend

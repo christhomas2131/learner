@@ -7,6 +7,8 @@ retriever degrades to FTS-only. Nothing here ever calls a paid API.
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.core.config import settings
 from app.core.logging import get_logger
 
@@ -15,7 +17,7 @@ log = get_logger("embeddings")
 
 class Embedder:
     def __init__(self) -> None:
-        self._model = None
+        self._model: Any = None
         self._tried = False
         self._available = False
 
@@ -45,7 +47,7 @@ class Embedder:
         if not self._available or not texts:
             return None
         try:
-            return [list(map(float, v)) for v in self._model.embed(texts)]  # type: ignore[union-attr]
+            return [list(map(float, v)) for v in self._model.embed(texts)]
         except Exception as e:  # noqa: BLE001
             log.warning("embed_failed", error=str(e))
             return None

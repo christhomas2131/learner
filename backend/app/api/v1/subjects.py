@@ -21,14 +21,13 @@ async def list_subjects(
     rows = (
         await session.execute(select(Subject).where(Subject.user_id == user.id).order_by(Subject.name))
     ).scalars().all()
-    counts = dict(
-        (
-            await session.execute(
-                select(Source.subject_id, func.count()).where(Source.user_id == user.id)
-                .group_by(Source.subject_id)
-            )
-        ).all()
-    )
+    count_rows = (
+        await session.execute(
+            select(Source.subject_id, func.count()).where(Source.user_id == user.id)
+            .group_by(Source.subject_id)
+        )
+    ).all()
+    counts: dict[str | None, int] = {sid: c for sid, c in count_rows}
     return [
         SubjectOut(id=s.id, name=s.name, description=s.description,
                    source_count=counts.get(s.id, 0))

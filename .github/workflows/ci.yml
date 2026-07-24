@@ -25,7 +25,7 @@ jobs:
       - name: Lint
         run: ruff check app
       - name: Type-check
-        run: mypy app || true
+        run: mypy app
       - name: Test
         run: pytest -q
       - name: Eval (hallucination scorecard)

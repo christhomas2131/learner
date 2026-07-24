@@ -172,3 +172,40 @@ async def test_sse_stream_order_and_final(client):
     assert "pipeline_stage" in events
     assert events[-1] == "completed"
     assert final_payload and final_payload["status"] == "VERIFIED"
+
+
+async def test_worker_status_endpoint(client):
+    r = await client.get("/api/v1/worker/status")
+    assert r.status_code == 200
+    body = r.json()
+    assert "online" in body and "last_seen" in body
+
+
+async def test_website_endpoint(client, monkeypatch):
+    from app.ingestion import web as web_mod
+
+    async def fake_fetch(url: str):
+        return "Example Biology Page", "Photosynthesis converts light energy into chemical energy."
+
+    monkeypatch.setattr(web_mod, "fetch_and_extract", fake_fetch)
+    r = await client.post("/api/v1/sources/website", json={"url": "https://example.com/bio"})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["source_type"] == "APPROVED_WEBSITE"
+    assert body["state"] == "PENDING_APPROVAL"
+    assert body["url"] == "https://example.com/bio"
+
+
+async def test_website_endpoint_rejects_private_url(client):
+    r = await client.post("/api/v1/sources/website", json={"url": "http://127.0.0.1/x"})
+    assert r.status_code == 422  # SSRF guard -> ValidationError
+
+
+async def test_session_export_docx(client):
+    await _seed_bio_source()
+    ans = await client.post("/api/v1/answers", json={"question": "What is photosynthesis?"})
+    sid = ans.json()["session_id"]
+    r = await client.get(f"/api/v1/sessions/{sid}/export.docx")
+    assert r.status_code == 200
+    assert "wordprocessingml" in r.headers.get("content-type", "")
+    assert r.content[:2] == b"PK"  # docx is a zip
