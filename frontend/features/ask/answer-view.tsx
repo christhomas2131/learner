@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Copy, RotateCcw } from "lucide-react";
+import { AlertOctagon, Copy, GitCompareArrows, HelpCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { TOP_LEVEL_STATUS } from "@/lib/verification";
+import { TONE_CLASSES, TOP_LEVEL_STATUS } from "@/lib/verification";
+import { buildCitedAnswer } from "@/lib/export-answer";
 import type { AnswerResponse } from "@/lib/api/schemas";
 
 /** Render answer text, turning [n] markers into clickable citation chips.
@@ -36,6 +36,44 @@ function renderWithCitations(text: string, onCite: (n: number) => void): React.R
   return parts;
 }
 
+const OUTCOME_ICON = { help: HelpCircle, conflict: GitCompareArrows, alert: AlertOctagon } as const;
+
+/** The determination. Every outcome gets the same structural weight: a
+ * tone-marked icon, a full-contrast label and a full-contrast description.
+ * A confident abstention must read as authoritative, not as a greyed-out
+ * failure — that outcome is the product's whole point. */
+function VerdictMark({ status }: { status: AnswerResponse["status"] }) {
+  const meta = TOP_LEVEL_STATUS[status];
+  const Icon = OUTCOME_ICON[meta.icon as keyof typeof OUTCOME_ICON] ?? HelpCircle;
+  return (
+    <div
+      className={cn(
+        "flex size-10 shrink-0 items-center justify-center rounded-md border",
+        TONE_CLASSES[meta.tone],
+      )}
+    >
+      {status === "VERIFIED" ? (
+        <span className="t-success-check" data-state="in" aria-hidden>
+          <svg
+            viewBox="0 0 48 48"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M13 25l7 7 15-16" />
+          </svg>
+        </span>
+      ) : (
+        <Icon className="size-5" aria-hidden />
+      )}
+    </div>
+  );
+}
+
 export function AnswerView({
   answer,
   onCite,
@@ -46,31 +84,24 @@ export function AnswerView({
   onRetry?: () => void;
 }) {
   const meta = TOP_LEVEL_STATUS[answer.status];
-  const isAbstain = answer.status !== "VERIFIED";
 
   return (
-    <article className="t-reveal rounded-lg border border-border bg-card p-6">
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        {answer.status === "VERIFIED" ? (
-          <span className="inline-flex items-center gap-2 rounded-md border border-verified/30 bg-verified-subtle px-2.5 py-1 text-sm font-medium text-verified">
-            <span className="t-success-check" data-state="in" aria-hidden>
-              <svg viewBox="0 0 48 48" width="18" height="18" fill="none" stroke="currentColor"
-                strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M13 25l7 7 15-16" />
-              </svg>
-            </span>
-            Verified
-          </span>
-        ) : (
-          <StatusBadge status={answer.status} />
-        )}
-        <div className="flex items-center gap-1">
+    <article className="t-reveal rounded-lg border border-border bg-card p-6" aria-label={`${meta.label} answer`}>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <VerdictMark status={answer.status} />
+          <div className="min-w-0">
+            <h2 className="font-display text-lg leading-tight text-foreground">{meta.label}</h2>
+            <p className="mt-1 text-sm text-foreground">{meta.description}</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
-              navigator.clipboard.writeText(answer.answer);
-              toast.success("Answer copied");
+              navigator.clipboard.writeText(buildCitedAnswer(answer));
+              toast.success("Answer + citations copied");
             }}
           >
             <Copy className="size-4" /> Copy
@@ -83,17 +114,10 @@ export function AnswerView({
         </div>
       </header>
 
-      <p className="mb-4 text-sm text-muted-foreground">{meta.description}</p>
-
-      <div
-        className={cn(
-          "text-[15px] leading-7",
-          isAbstain && "italic text-muted-foreground",
-        )}
-      >
+      <div className="mt-5 border-t border-border pt-5 text-[15px] leading-7 text-foreground">
         {answer.answer
           ? renderWithCitations(answer.answer, onCite)
-          : "No answer text."}
+          : <span className="text-muted-foreground">No answer text.</span>}
       </div>
 
       {answer.status === "CONTRADICTION" && answer.contradiction_detail && (

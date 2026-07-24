@@ -16,7 +16,7 @@
   --check-path-dur: 520ms;
   --check-path-delay: 80ms;
   --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
+  --check-ease-bob: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Panel reveal (mount): answer + pipeline cards slide up with a cross-blur. */
@@ -33,6 +33,20 @@
   to   { opacity: 1; scale: 1; }
 }
 .t-modal-in { animation: t-modal-in var(--modal-open-dur) var(--modal-ease) both; }
+
+/* Sheet open (mount): evidence panel slides in from the right edge. */
+@keyframes t-sheet-right-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: none; }
+}
+.t-sheet-right { animation: t-sheet-right-in var(--panel-open-dur) var(--panel-ease) both; }
+
+/* Sheet open (mount): left-anchored drawer (mobile navigation) slides in. */
+@keyframes t-sheet-left-in {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: none; }
+}
+.t-sheet-left { animation: t-sheet-left-in var(--panel-open-dur) var(--panel-ease) both; }
 
 /* Success check: fade + rotate-upright + Y-bob + stroke-draw for the VERIFIED
    moment. */
@@ -61,17 +75,19 @@
 @keyframes t-check-draw { to { stroke-dashoffset: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .t-reveal, .t-modal-in, .t-success-check, .t-success-check[data-state="in"],
+  .t-reveal, .t-modal-in, .t-sheet-right, .t-sheet-left, .t-success-check, .t-success-check[data-state="in"],
   .t-success-check[data-state="in"] svg path { animation: none !important; }
-  .t-reveal, .t-modal-in, .t-success-check {
+  .t-reveal, .t-modal-in, .t-sheet-right, .t-sheet-left, .t-success-check {
     opacity: 1; transform: none; filter: none; scale: 1; translate: 0 0;
   }
   .t-success-check svg path { stroke-dashoffset: 0 !important; }
 }
-.reduce-motion .t-reveal, .reduce-motion .t-modal-in,
-.reduce-motion .t-success-check, .reduce-motion .t-success-check[data-state="in"],
+.reduce-motion .t-reveal, .reduce-motion .t-modal-in, .reduce-motion .t-sheet-right,
+.reduce-motion .t-sheet-left, .reduce-motion .t-success-check,
+.reduce-motion .t-success-check[data-state="in"],
 .reduce-motion .t-success-check[data-state="in"] svg path { animation: none !important; }
-.reduce-motion .t-reveal, .reduce-motion .t-modal-in, .reduce-motion .t-success-check {
+.reduce-motion .t-reveal, .reduce-motion .t-modal-in, .reduce-motion .t-sheet-right,
+.reduce-motion .t-sheet-left, .reduce-motion .t-success-check {
   opacity: 1; transform: none; filter: none;
 }
 .reduce-motion .t-success-check svg path { stroke-dashoffset: 0 !important; }

@@ -1,15 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { Menu, ShieldCheck, X } from "lucide-react";
+import { Menu, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Sidebar } from "@/components/layout/sidebar";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  // Close the mobile drawer when the layout switches to desktop.
+  React.useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const onChange = () => mq.matches && setMobileOpen(false);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   return (
     <div className="flex h-dvh w-full overflow-hidden">
@@ -30,23 +39,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-72 border-r border-border bg-subtle">
-            <div className="flex justify-end p-2">
-              <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)} aria-label="Close navigation">
-                <X className="size-4" />
-              </Button>
+      {/* Mobile drawer — Radix Sheet gives focus trap, Escape, scroll lock, and focus
+          restoration that the previous hand-rolled overlay lacked. */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" hideClose className="w-72 bg-subtle p-0">
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SheetDescription className="sr-only">
+            Sessions, knowledge library, progress, and settings.
+          </SheetDescription>
+          <div className="flex h-full flex-col">
+            <div className="flex-1 overflow-hidden">
+              <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
             </div>
-            <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
             <div className="border-t border-border p-3">
               <ThemeToggle />
             </div>
           </div>
-        </div>
-      )}
+        </SheetContent>
+      </Sheet>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}

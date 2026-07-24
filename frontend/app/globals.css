@@ -27,18 +27,21 @@
   --ring: oklch(0.55 0.16 264);
 
   /* Verification states — never signalled by color alone in UI. */
-  --verified: oklch(0.55 0.13 155);
+  /* Text tones darkened so status chip text clears WCAG AA (>=4.5:1) on the
+     pale subtle backgrounds; error carries real red chroma so a genuine
+     failure never reads as a neutral note. Verified with contrast math. */
+  --verified: oklch(0.48 0.14 155);
   --verified-foreground: oklch(0.98 0.02 155);
   --verified-subtle: oklch(0.95 0.03 155);
-  --insufficient: oklch(0.6 0.11 75);
+  --insufficient: oklch(0.5 0.12 72);
   --insufficient-foreground: oklch(0.99 0.02 75);
   --insufficient-subtle: oklch(0.96 0.04 85);
-  --contradiction: oklch(0.58 0.19 25);
+  --contradiction: oklch(0.5 0.2 25);
   --contradiction-foreground: oklch(0.99 0.02 25);
   --contradiction-subtle: oklch(0.96 0.04 25);
-  --error: oklch(0.55 0.02 260);
+  --error: oklch(0.48 0.15 22);
   --error-foreground: oklch(0.98 0 0);
-  --error-subtle: oklch(0.95 0.004 260);
+  --error-subtle: oklch(0.95 0.045 22);
 
   --radius: 0.7rem;
 }
@@ -74,9 +77,9 @@
   --contradiction: oklch(0.68 0.17 28);
   --contradiction-foreground: oklch(0.16 0.02 28);
   --contradiction-subtle: oklch(0.3 0.07 28);
-  --error: oklch(0.7 0.01 260);
+  --error: oklch(0.72 0.15 22);
   --error-foreground: oklch(0.16 0 0);
-  --error-subtle: oklch(0.28 0.008 265);
+  --error-subtle: oklch(0.32 0.08 22);
 }
 
 @theme inline {

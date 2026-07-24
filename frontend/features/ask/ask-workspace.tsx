@@ -1,20 +1,15 @@
 "use client";
 
 import * as React from "react";
-import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
-import { BorderBeam } from "border-beam";
-import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { AlertOctagon, Copy, Loader2, PanelRightClose, PanelRightOpen, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { Button } from "@/components/ui/button";
-
-const ThinkingOrb = dynamic(() => import("thinking-orbs").then((m) => m.ThinkingOrb), {
-  ssr: false,
-});
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { apiFetch } from "@/lib/api/client";
 import { answerResponse, enqueueResponse, type AnswerResponse } from "@/lib/api/schemas";
+import { TOP_LEVEL_STATUS } from "@/lib/verification";
 import { streamAnswer, streamQueueEvents, type SseEvent } from "@/lib/api/sse";
 import { Composer, type AskMode } from "@/features/ask/composer";
 import { PipelineProgress } from "@/features/ask/pipeline-progress";
@@ -23,6 +18,7 @@ import { EvidencePanel } from "@/features/ask/evidence-panel";
 
 interface RunState {
   question: string;
+  mode: AskMode;
   reached: Set<string>;
   activeStage: string | null;
   lastMessage: string;
@@ -34,6 +30,7 @@ interface RunState {
 
 const INITIAL: RunState = {
   question: "",
+  mode: "grounded",
   reached: new Set(),
   activeStage: null,
   lastMessage: "",
@@ -42,6 +39,20 @@ const INITIAL: RunState = {
   queueId: null,
   error: null,
 };
+
+/** True below the `lg` breakpoint, where the fixed evidence aside cannot show
+ * and the evidence must open in a sheet instead. */
+function useBelowLg() {
+  const [below, setBelow] = React.useState(false);
+  React.useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const sync = () => setBelow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  return below;
+}
 
 export function AskWorkspace({
   sessionId,
@@ -53,22 +64,25 @@ export function AskWorkspace({
   suggestions?: string[];
 }) {
   const qc = useQueryClient();
-  const reduced = useReducedMotion();
+  const belowLg = useBelowLg();
   const [run, setRun] = React.useState<RunState>(() => ({
     ...INITIAL,
     answer: initialAnswer ?? null,
+    question: initialAnswer?.question ?? "",
   }));
+  const [mode, setMode] = React.useState<AskMode>("grounded");
   const [panelOpen, setPanelOpen] = React.useState(true);
+  const [mobileEvidenceOpen, setMobileEvidenceOpen] = React.useState(false);
   const [selectedCitation, setSelectedCitation] = React.useState<number | null>(null);
   const [tab, setTab] = React.useState("claims");
   const abortRef = React.useRef<AbortController | null>(null);
 
-  async function ask(question: string, mode: AskMode) {
+  async function ask(question: string, askMode: AskMode) {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     setSelectedCitation(null);
-    setRun({ ...INITIAL, question, streaming: true });
+    setRun({ ...INITIAL, question, mode: askMode, streaming: true });
 
     const onEvent = (ev: SseEvent) =>
       setRun((r) => {
@@ -99,7 +113,7 @@ export function AskWorkspace({
       });
 
     try {
-      if (mode === "premium") {
+      if (askMode === "premium") {
         // Enqueue, then stream the worker's live pipeline events over SSE.
         const enq = await apiFetch("/api/v1/answers", enqueueResponse, {
           method: "POST",
@@ -109,7 +123,7 @@ export function AskWorkspace({
         await streamQueueEvents(enq.queue_id, onEvent, controller.signal);
       } else {
         await streamAnswer(
-          { question, mode, session_id: sessionId ?? null }, onEvent, controller.signal,
+          { question, mode: askMode, session_id: sessionId ?? null }, onEvent, controller.signal,
         );
       }
     } catch (e) {
@@ -129,17 +143,30 @@ export function AskWorkspace({
 
   function onCite(n: number) {
     setSelectedCitation(n);
-    setPanelOpen(true);
     setTab("claims");
+    if (belowLg) setMobileEvidenceOpen(true);
+    else setPanelOpen(true);
   }
 
   const showRun = run.streaming || run.answer || run.error;
   // "Waiting for a worker" only until the first live pipeline event arrives;
   // then the normal pipeline progress takes over.
-  const waitingPremium = !!run.queueId && !run.answer && run.reached.size === 0;
+  const waitingPremium = !!run.queueId && !run.answer && !run.error && run.reached.size === 0;
+
+  // Persistent live region: the verdict (and errors) must reach assistive tech,
+  // since the pipeline's own live region unmounts when streaming ends.
+  const liveMessage = run.error
+    ? `Error: ${run.error}`
+    : run.answer && !run.streaming
+      ? `${TOP_LEVEL_STATUS[run.answer.status].label}. ${TOP_LEVEL_STATUS[run.answer.status].description}`
+      : "";
 
   return (
     <div className="flex h-full min-h-0">
+      <p className="sr-only" role="status" aria-live="polite">
+        {liveMessage}
+      </p>
+
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-5 md:p-8">
           {!showRun && (
@@ -153,7 +180,7 @@ export function AskWorkspace({
           )}
 
           <Composer onSubmit={ask} onCancel={cancel} streaming={run.streaming} autoFocus={!sessionId}
-            compact={!!showRun} />
+            compact={!!showRun} mode={mode} onModeChange={setMode} />
 
           {!showRun && suggestions && suggestions.length > 0 && (
             <div className="flex flex-col gap-2">
@@ -162,7 +189,7 @@ export function AskWorkspace({
                 {suggestions.map((s) => (
                   <button
                     key={s}
-                    onClick={() => ask(s, "grounded")}
+                    onClick={() => ask(s, mode)}
                     className="rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
                   >
                     {s}
@@ -180,33 +207,55 @@ export function AskWorkspace({
 
           {waitingPremium ? (
             <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm">
-              <ThinkingOrb state="working" size={64} theme="auto" paused={reduced}
-                style={{ width: 40, height: 40 }} aria-label="Waiting for a Claude Code worker" />
+              <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
               <span>{run.lastMessage}</span>
             </div>
           ) : (
             run.streaming && (
-              <BorderBeam size="md" colorVariant="ocean" theme="auto" active={!reduced}
-                borderRadius={12}>
-                <PipelineProgress reached={run.reached} activeStage={run.activeStage}
-                  done={false} lastMessage={run.lastMessage} />
-              </BorderBeam>
+              <PipelineProgress reached={run.reached} activeStage={run.activeStage}
+                done={false} lastMessage={run.lastMessage} mode={run.mode} />
             )
           )}
 
           {run.error && (
             <div className="rounded-lg border border-error/40 bg-error-subtle p-4 text-sm text-error">
-              {run.error}
+              <div className="flex items-start gap-2">
+                <AlertOctagon className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">Verification could not complete</p>
+                  <p className="mt-1 break-words text-error/90">{run.error}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    {run.question && (
+                      <Button variant="outline" size="sm" onClick={() => ask(run.question, run.mode)}>
+                        <RotateCcw className="size-4" /> Retry
+                      </Button>
+                    )}
+                    {run.queueId && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(run.queueId!);
+                          toast.success("Reference copied");
+                        }}
+                        className="inline-flex items-center gap-1 text-xs text-error/80 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label="Copy reference id"
+                      >
+                        <Copy className="size-3" /> Ref {run.queueId}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
           {run.answer && !run.streaming && (
             <AnswerView answer={run.answer} onCite={onCite}
-              onRetry={() => ask(run.answer!.question, "grounded")} />
+              onRetry={() => ask(run.answer!.question, run.mode)} />
           )}
         </div>
       </div>
 
+      {/* Desktop (lg+): fixed evidence aside + toggle. */}
       {run.answer && (
         <>
           <aside
@@ -224,12 +273,38 @@ export function AskWorkspace({
             variant="outline"
             size="icon"
             onClick={() => setPanelOpen((o) => !o)}
-            className="fixed bottom-6 right-6 hidden lg:flex"
+            className="fixed bottom-6 right-6 z-40 hidden lg:flex"
             aria-label={panelOpen ? "Hide evidence panel" : "Show evidence panel"}
           >
             {panelOpen ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
           </Button>
         </>
+      )}
+
+      {/* Below lg: evidence opens in a sheet (citations + this button trigger it). */}
+      {run.answer && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setMobileEvidenceOpen(true)}
+          className="fixed bottom-6 right-6 z-40 shadow-sm lg:hidden"
+        >
+          <PanelRightOpen className="size-4" /> Evidence
+        </Button>
+      )}
+      {run.answer && belowLg && (
+        <Sheet open={mobileEvidenceOpen} onOpenChange={setMobileEvidenceOpen}>
+          <SheetContent className="p-0">
+            <SheetTitle className="sr-only">Evidence</SheetTitle>
+            <SheetDescription className="sr-only">
+              Sources, claims, and the audit trace for this answer.
+            </SheetDescription>
+            <div className="h-full overflow-hidden">
+              <EvidencePanel answer={run.answer} selectedCitation={selectedCitation}
+                tab={tab} onTabChange={setTab} headerClassName="pr-10" />
+            </div>
+          </SheetContent>
+        </Sheet>
       )}
     </div>
   );

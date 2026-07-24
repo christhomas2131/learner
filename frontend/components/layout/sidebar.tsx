@@ -104,6 +104,7 @@ export function Sidebar({
                     <li key={s.id}>
                       <Link
                         href={`/sessions/${s.id}`}
+                        aria-current={active ? "page" : undefined}
                         className={cn(
                           "flex flex-col gap-1 rounded-md px-2 py-1.5 text-sm hover:bg-muted",
                           active && "bg-muted",

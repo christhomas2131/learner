@@ -1,17 +1,12 @@
 "use client";
 
 import * as React from "react";
-import dynamic from "next/dynamic";
 import { ArrowUp, ShieldCheck, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useWorkerStatus } from "@/lib/api/hooks";
-
-// WebGL liquid-metal effect: SSR-safe, but mount client-only to be safe.
-const MetalFx = dynamic(() => import("metal-fx").then((m) => m.MetalFx), { ssr: false });
 
 export type AskMode = "grounded" | "premium";
 
@@ -23,18 +18,27 @@ export function Composer({
   streaming,
   autoFocus,
   compact,
+  mode: controlledMode,
+  onModeChange,
 }: {
   onSubmit: (question: string, mode: AskMode) => void;
   onCancel?: () => void;
   streaming: boolean;
   autoFocus?: boolean;
   compact?: boolean;
+  /** Controlled selected mode. Falls back to internal state when omitted. */
+  mode?: AskMode;
+  onModeChange?: (mode: AskMode) => void;
 }) {
   const [value, setValue] = React.useState("");
-  const [mode, setMode] = React.useState<AskMode>("grounded");
-  const reduced = useReducedMotion();
+  const [internalMode, setInternalMode] = React.useState<AskMode>("grounded");
+  const mode = controlledMode ?? internalMode;
+  const setMode = (m: AskMode) => (onModeChange ? onModeChange(m) : setInternalMode(m));
   const { data: worker } = useWorkerStatus();
   const workerOnline = worker?.online ?? false;
+
+  const remaining = MAX - value.length;
+  const nearLimit = remaining <= 200;
 
   function submit() {
     const q = value.trim();
@@ -79,43 +83,48 @@ export function Composer({
             title={workerOnline ? "Claude Code worker online" : "No Claude Code worker running"}
           >
             <span
-              className={cn(
-                "size-1.5 rounded-full",
-                workerOnline ? "bg-verified" : "bg-muted-foreground/40",
-              )}
+              className={cn("size-1.5 rounded-full", workerOnline ? "bg-verified" : "bg-muted-foreground/40")}
             />
             {workerOnline ? "worker online" : "no worker"}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground" aria-live="polite">
+          {/* Submit hint is discoverable; ⌘/Ctrl+Enter also submits. */}
+          <span className={cn("text-xs tabular-nums", nearLimit ? "font-medium text-foreground" : "text-muted-foreground")}>
             {value.length}/{MAX}
+          </span>
+          {/* Coarse announcement: at most two distinct messages, never a
+              per-keystroke count. */}
+          <span className="sr-only" role="status" aria-live="polite">
+            {remaining <= 0 ? "Character limit reached." : nearLimit ? "Approaching character limit." : ""}
           </span>
           {streaming && onCancel ? (
             <Button variant="outline" size="sm" onClick={onCancel}>
               <X className="size-4" /> Cancel
             </Button>
           ) : (
-            <MetalFx variant="circle" preset="chromatic" theme="auto" paused={reduced}
-              style={{ borderRadius: 9999 }}>
-              <button
-                type="button"
-                onClick={submit}
-                disabled={!value.trim()}
-                aria-label="Ask"
-                className="flex size-9 items-center justify-center rounded-full transition-opacity disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {/* difference blend keeps the arrow legible over light OR dark metal */}
-                <ArrowUp className="size-4 text-white" style={{ mixBlendMode: "difference" }} />
-              </button>
-            </MetalFx>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  onClick={submit}
+                  disabled={!value.trim()}
+                  aria-label="Ask"
+                  className="rounded-full"
+                >
+                  <ArrowUp className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Ask · ⌘↵</TooltipContent>
+            </Tooltip>
           )}
         </div>
       </div>
       {mode === "premium" && !workerOnline && (
         <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
-          No Claude Code worker is running — premium questions will queue until one is.
-          Grounded answers work right now.
+          No Claude Code worker is running — premium questions will queue until one is. Grounded
+          answers work right now.
         </p>
       )}
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, FileText, Trash2, Upload, X } from "lucide-react";
+import { CheckCircle2, Circle, Clock, FileText, Trash2, Upload, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api/client";
@@ -93,7 +93,7 @@ export default function LibraryPage() {
           handleFiles(e.dataTransfer.files);
         }}
         className={cn(
-          "mb-6 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-8 text-center transition-colors hover:bg-muted/50",
+          "mb-6 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-8 text-center transition-colors hover:bg-muted/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring",
           dragging && "border-primary bg-accent/40",
         )}
       >
@@ -104,7 +104,7 @@ export default function LibraryPage() {
         <span className="text-xs text-muted-foreground">Markdown, TXT, PDF, or DOCX</span>
         <input
           type="file"
-          className="hidden"
+          className="sr-only"
           accept=".md,.markdown,.txt,.pdf,.docx"
           multiple
           onChange={(e) => handleFiles(e.target.files)}
@@ -137,6 +137,7 @@ export default function LibraryPage() {
           <button
             key={f}
             onClick={() => setFilter(f)}
+            aria-pressed={filter === f}
             className={cn(
               "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
               filter === f ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted",
@@ -161,7 +162,9 @@ export default function LibraryPage() {
       )}
       {data && data.items.length === 0 && (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          No sources yet. Upload one above to get started.
+          {filter === "ALL"
+            ? "No sources yet. Upload one above to get started."
+            : `No ${filter.replace("_", " ").toLowerCase()} sources.`}
         </p>
       )}
 
@@ -240,15 +243,21 @@ function SourceCard({ source, onInspect }: { source: SourceOut; onInspect: () =>
 }
 
 function StateBadge({ state }: { state: string }) {
-  const tone =
+  // Pair state with an icon (not color alone), matching the app's status badges.
+  const { tone, Icon } =
     state === "APPROVED"
-      ? "text-verified"
+      ? { tone: "text-verified", Icon: CheckCircle2 }
       : state === "PENDING_APPROVAL"
-        ? "text-insufficient"
+        ? { tone: "text-insufficient", Icon: Clock }
         : state === "REJECTED" || state === "FAILED"
-          ? "text-contradiction"
-          : "text-muted-foreground";
-  return <span className={cn("font-medium", tone)}>{state.replace("_", " ").toLowerCase()}</span>;
+          ? { tone: "text-contradiction", Icon: XCircle }
+          : { tone: "text-muted-foreground", Icon: Circle };
+  return (
+    <span className={cn("inline-flex items-center gap-1 font-medium", tone)}>
+      <Icon className="size-3.5" aria-hidden />
+      {state.replace("_", " ").toLowerCase()}
+    </span>
+  );
 }
 
 function PassageList({ sourceId }: { sourceId: string }) {

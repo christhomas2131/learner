@@ -19,7 +19,11 @@ export default function SessionPage() {
 
   if (isError)
     return (
-      <div className="p-8 text-sm text-error">Session not found or backend unavailable.</div>
+      <div className="p-5 md:p-8">
+        <div className="rounded-md border border-error/40 bg-error-subtle p-4 text-sm text-error">
+          Session not found, or the backend is unavailable.
+        </div>
+      </div>
     );
 
   return (

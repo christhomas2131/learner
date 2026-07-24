@@ -57,12 +57,13 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm">Theme</span>
-            <div className="flex gap-1">
+            <div className="flex gap-1" role="group" aria-label="Theme">
               {(["system", "light", "dark"] as const).map((t) => (
                 <Button
                   key={t}
                   size="sm"
                   variant={activeTheme === t ? "secondary" : "ghost"}
+                  aria-pressed={activeTheme === t}
                   onClick={() => setTheme(t)}
                   className="capitalize"
                 >
@@ -73,12 +74,13 @@ export default function SettingsPage() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm">Font size</span>
-            <div className="flex gap-1">
+            <div className="flex gap-1" role="group" aria-label="Font size">
               {(["sm", "md", "lg"] as const).map((s) => (
                 <Button
                   key={s}
                   size="sm"
                   variant={fontSize === s ? "secondary" : "ghost"}
+                  aria-pressed={fontSize === s}
                   onClick={() => setFontSize(s)}
                   className="uppercase"
                 >
@@ -89,7 +91,7 @@ export default function SettingsPage() {
           </div>
           <label className="flex items-center justify-between">
             <span className="text-sm">Reduced motion</span>
-            <Switch checked={reducedMotion} onCheckedChange={setReducedMotion} />
+            <Switch checked={reducedMotion} onCheckedChange={setReducedMotion} aria-label="Reduced motion" />
           </label>
         </CardContent>
       </Card>
@@ -106,7 +108,7 @@ export default function SettingsPage() {
                 Show safe request/audit metadata. Never exposes prompts, keys, or model reasoning.
               </span>
             </span>
-            <Switch checked={diagnostics} onCheckedChange={setDiagnostics} />
+            <Switch checked={diagnostics} onCheckedChange={setDiagnostics} aria-label="Developer diagnostics" />
           </label>
         </CardContent>
       </Card>
