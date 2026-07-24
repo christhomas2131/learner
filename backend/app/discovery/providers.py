@@ -25,9 +25,14 @@ from app.providers.claude_cli import _extract_json, claude_cli_available
 
 log = get_logger("discovery")
 
-# A descriptive UA — Wikipedia's API asks for one; DDG's HTML endpoint needs a
-# non-empty, browser-ish UA or it returns nothing.
-_UA = "LearnerBot/1.0 (verified-learning app; keyless source discovery)"
+# Wikipedia's API enforces its User-Agent policy — a descriptive UA with contact
+# info; a generic bot UA gets 403. DuckDuckGo's HTML endpoint blocks non-browser
+# UAs (returns a 202 challenge), so it needs a realistic browser UA + Accept.
+_WIKI_UA = "Learner/1.0 (https://github.com/christhomas2131/learner; verified-learning tool)"
+_BROWSER_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/122.0 Safari/537.36"
+)
 
 
 class DiscoveryProvider(Protocol):
@@ -53,7 +58,7 @@ class WikipediaProvider:
         }
         try:
             async with httpx.AsyncClient(timeout=settings.AUTO_DISCOVERY_TIMEOUT_SECONDS,
-                                         headers={"User-Agent": _UA}) as client:
+                                         headers={"User-Agent": _WIKI_UA}) as client:
                 resp = await client.get(self._API, params=params)
                 resp.raise_for_status()
                 data = resp.json()
@@ -81,7 +86,9 @@ class DuckDuckGoProvider:
     async def search(self, query: str, *, limit: int) -> list[Candidate]:
         try:
             async with httpx.AsyncClient(timeout=settings.AUTO_DISCOVERY_TIMEOUT_SECONDS,
-                                         headers={"User-Agent": _UA},
+                                         headers={"User-Agent": _BROWSER_UA,
+                                                  "Accept": "text/html",
+                                                  "Accept-Language": "en-US,en;q=0.9"},
                                          follow_redirects=True) as client:
                 resp = await client.post(self._URL, data={"q": query})
                 resp.raise_for_status()

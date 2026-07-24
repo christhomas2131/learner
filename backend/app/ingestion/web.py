@@ -19,7 +19,12 @@ log = get_logger("web_ingest")
 
 MAX_BYTES = 5 * 1024 * 1024
 MAX_REDIRECTS = 5
-_UA = "LearnerBot/0.1 (+personal verified-learning app)"
+# A realistic browser UA: many sites (incl. Wikipedia article pages) 403 an
+# obvious bot UA. We fetch only URLs the user explicitly approved.
+_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/122.0 Safari/537.36"
+)
 
 
 class WebFetchError(Exception):
@@ -68,7 +73,9 @@ async def fetch_and_extract(url: str) -> tuple[str, str]:
     """
     current = httpx.URL(url)
     async with httpx.AsyncClient(
-        timeout=15.0, follow_redirects=False, headers={"User-Agent": _UA}
+        timeout=15.0, follow_redirects=False,
+        headers={"User-Agent": _UA, "Accept": "text/html,application/xhtml+xml",
+                 "Accept-Language": "en-US,en;q=0.9"},
     ) as client:
         for _ in range(MAX_REDIRECTS + 1):
             _assert_public_url(str(current))
