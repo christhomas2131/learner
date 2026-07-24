@@ -25,18 +25,28 @@ log = get_logger("discovery")
 
 
 async def discover(query: str, *, limit: int | None = None) -> tuple[str, list[Candidate]]:
-    """Search all enabled providers concurrently and return (discovery_id, fused)."""
+    """Search all enabled providers concurrently within a time budget and return
+    (discovery_id, fused). A slow or hung provider can't hold up the rest —
+    anything not back within AUTO_DISCOVERY_TIMEOUT_SECONDS is cancelled + dropped."""
     cap = limit or settings.AUTO_DISCOVERY_MAX_CANDIDATES
     provs = enabled_providers()
-    results = await asyncio.gather(
-        *(p.search(query, limit=cap) for p in provs), return_exceptions=True
+    if not provs:
+        return new_uuid(), []
+    tasks = {asyncio.create_task(p.search(query, limit=cap)): p for p in provs}
+    done, pending = await asyncio.wait(
+        list(tasks), timeout=settings.AUTO_DISCOVERY_TIMEOUT_SECONDS
     )
+    if pending:
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+        log.warning("providers_timed_out", providers=[tasks[t].name for t in pending])
     lists: list[list[Candidate]] = []
-    for prov, res in zip(provs, results, strict=False):
-        if isinstance(res, BaseException):
-            log.warning("provider_raised", provider=prov.name, error=str(res))
-            continue
-        lists.append(res)
+    for task in done:
+        try:
+            lists.append(task.result())
+        except Exception as e:  # noqa: BLE001 - a failed provider just contributes nothing
+            log.warning("provider_failed", provider=tasks[task].name, error=str(e))
     fused = fuse_candidates(lists, k=settings.RRF_K, limit=cap)
     log.info("discovery_done", query=query, providers=len(provs), candidates=len(fused))
     return new_uuid(), fused

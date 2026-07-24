@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_session
 from app.api.errors import ValidationError
 from app.api.schemas import ConfirmDiscoveryRequest
+from app.core.logging import get_logger
 from app.discovery.service import ingest_and_approve
 from app.models import User
 from app.schemas.api import AnswerResponse
@@ -15,6 +16,7 @@ from app.services.answering import answer_and_persist
 from app.services.audit import to_response
 
 router = APIRouter()
+log = get_logger("discovery")
 
 
 @router.post("/discovery/confirm", response_model=AnswerResponse)
@@ -34,6 +36,8 @@ async def confirm_discovery(
         sources=[(s.url, s.title) for s in body.sources],
         subject_id=body.subject_id,
     )
+    if errors:
+        log.warning("discovery_confirm_partial", added=len(approved), errors=errors)
     if not approved:
         detail = "; ".join(errors) if errors else "the URLs could not be fetched."
         raise ValidationError(f"No sources could be added: {detail}")

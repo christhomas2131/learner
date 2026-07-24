@@ -18,6 +18,7 @@ from app.core.logging import get_logger
 log = get_logger("web_ingest")
 
 MAX_BYTES = 5 * 1024 * 1024
+MAX_REDIRECTS = 5
 _UA = "LearnerBot/0.1 (+personal verified-learning app)"
 
 
@@ -58,23 +59,43 @@ def _extract(html: str) -> tuple[str, str]:
 
 
 async def fetch_and_extract(url: str) -> tuple[str, str]:
-    """Return (title, extracted_text). Raises WebFetchError on any problem."""
-    _assert_public_url(url)
-    try:
-        async with httpx.AsyncClient(
-            timeout=15.0, follow_redirects=True, headers={"User-Agent": _UA}
-        ) as client:
-            resp = await client.get(url)
-    except httpx.HTTPError as e:
-        raise WebFetchError(f"Fetch failed: {e}") from e
-    if resp.status_code >= 400:
-        raise WebFetchError(f"Fetch returned HTTP {resp.status_code}.")
-    if len(resp.content) > MAX_BYTES:
-        raise WebFetchError("Page is too large to ingest.")
-    ctype = resp.headers.get("content-type", "")
-    if "html" not in ctype and "text" not in ctype:
-        raise WebFetchError(f"Unsupported content type: {ctype or 'unknown'}")
-    title, text = _extract(resp.text)
-    if not text.strip():
-        raise WebFetchError("No readable text extracted from the page.")
-    return title or url, text
+    """Return (title, extracted_text). Raises WebFetchError on any problem.
+
+    Redirects are followed manually so the SSRF guard runs on EVERY hop — a public
+    URL must not be able to 30x-redirect into a loopback/private/metadata address.
+    The body is streamed with a hard byte cap so an oversized page can't exhaust
+    memory before we reject it.
+    """
+    current = httpx.URL(url)
+    async with httpx.AsyncClient(
+        timeout=15.0, follow_redirects=False, headers={"User-Agent": _UA}
+    ) as client:
+        for _ in range(MAX_REDIRECTS + 1):
+            _assert_public_url(str(current))
+            try:
+                async with client.stream("GET", current) as resp:
+                    if resp.is_redirect:
+                        location = resp.headers.get("location")
+                        if not location:
+                            raise WebFetchError("Redirect without a Location header.")
+                        current = current.join(location)
+                        continue
+                    if resp.status_code >= 400:
+                        raise WebFetchError(f"Fetch returned HTTP {resp.status_code}.")
+                    ctype = resp.headers.get("content-type", "")
+                    if "html" not in ctype and "text" not in ctype:
+                        raise WebFetchError(f"Unsupported content type: {ctype or 'unknown'}")
+                    body = bytearray()
+                    async for chunk in resp.aiter_bytes():
+                        body += chunk
+                        if len(body) > MAX_BYTES:
+                            raise WebFetchError("Page is too large to ingest.")
+                    title, text = _extract(
+                        bytes(body).decode(resp.encoding or "utf-8", errors="replace")
+                    )
+                    if not text.strip():
+                        raise WebFetchError("No readable text extracted from the page.")
+                    return title or str(current), text
+            except httpx.HTTPError as e:
+                raise WebFetchError(f"Fetch failed: {e}") from e
+    raise WebFetchError("Too many redirects.")

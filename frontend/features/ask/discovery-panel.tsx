@@ -94,6 +94,10 @@ export function DiscoveryPanel({
       <ul className="mt-5 flex flex-col gap-2 border-t border-border pt-5">
         {candidates.map((c) => {
           const isSelected = selected.has(c.url);
+          // Wikipedia/DuckDuckGo snippets come from the real page; a claude_web-only
+          // snippet is model-written and may not reflect the page — flag it so the
+          // approval decision isn't made on possibly-fabricated preview text.
+          const aiSnippet = c.providers.length > 0 && c.providers.every((p) => p === "claude_web");
           return (
             <li key={c.url}>
               <button
@@ -134,7 +138,14 @@ export function DiscoveryPanel({
                     <span className="truncate">{hostOf(c.url)}</span>
                   </span>
                   {c.snippet && (
-                    <span className="mt-1 block text-sm text-muted-foreground">{c.snippet}</span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      {c.snippet}
+                      {aiSnippet && (
+                        <span className="ml-1 whitespace-nowrap text-[10px] uppercase tracking-wide text-insufficient">
+                          AI-suggested · unverified
+                        </span>
+                      )}
+                    </span>
                   )}
                 </span>
               </button>

@@ -69,7 +69,10 @@ class Settings(BaseSettings):
     AUTO_DISCOVERY_TIMEOUT_SECONDS: int = 12
     AUTO_DISCOVERY_WIKIPEDIA: bool = True
     AUTO_DISCOVERY_DUCKDUCKGO: bool = True
-    AUTO_DISCOVERY_CLAUDE_WEB: bool = True
+    # Off by default: headless `claude -p` web search is unverified end-to-end
+    # (model/permission/tool availability vary by environment) and could surface
+    # hallucinated URLs. Opt in only where the local `claude` CLI web-searches.
+    AUTO_DISCOVERY_CLAUDE_WEB: bool = False
 
     CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     LOG_LEVEL: str = "INFO"

@@ -49,6 +49,8 @@ describe("DiscoveryPanel", () => {
     expect(screen.getByText("Wikipedia")).toBeInTheDocument();
     expect(screen.getByText("DuckDuckGo")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add 2 sources & answer/i })).toBeEnabled();
+    // The claude_web-only candidate's snippet is flagged; the corroborated one isn't.
+    expect(screen.getByText(/AI-suggested/i)).toBeInTheDocument();
   });
 
   it("prunes a candidate and confirms only the selected ones", async () => {

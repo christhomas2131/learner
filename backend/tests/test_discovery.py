@@ -235,3 +235,51 @@ async def test_discovery_confirm_rejects_private_url(client):
         "sources": [{"url": "http://127.0.0.1/x"}],
     })
     assert r.status_code == 422  # SSRF guard -> IngestionError -> 0 approved -> ValidationError
+
+
+async def test_discovery_confirm_partial_failure_still_answers(client, monkeypatch):
+    from app.ingestion import web as web_mod
+
+    async def fake_fetch(url):
+        if "bad" in url:
+            raise web_mod.WebFetchError("unreachable")
+        return "Bio Page", BIO_TEXT
+
+    monkeypatch.setattr(web_mod, "fetch_and_extract", fake_fetch)
+    r = await client.post("/api/v1/discovery/confirm", json={
+        "question": "What is photosynthesis?",
+        "sources": [
+            {"url": "https://good.example/bio", "title": "Bio"},
+            {"url": "https://bad.example/x", "title": "Bad"},
+        ],
+    })
+    # One source fetched fine, one failed — we still answer over what was added.
+    assert r.status_code == 200
+    assert r.json()["status"] == "VERIFIED"
+
+
+async def test_stream_answer_needs_sources(client, monkeypatch):
+    import json
+
+    monkeypatch.setattr(settings, "AUTO_DISCOVERY_ENABLED", True)
+
+    async def fake_discover(question, *, limit=None):
+        return "disc-stream", [Candidate(url="https://ex.com/a", title="A",
+                                         snippet="s", providers=["wikipedia"])]
+
+    monkeypatch.setattr("app.api.v1.answers.discover", fake_discover)
+    events: list[str] = []
+    final = None
+    async with client.stream("POST", "/api/v1/answers/stream",
+                             json={"question": "What is photosynthesis?"}) as resp:
+        assert resp.status_code == 200
+        current = None
+        async for line in resp.aiter_lines():
+            if line.startswith("event:"):
+                current = line.split(":", 1)[1].strip()
+                events.append(current)
+            elif line.startswith("data:") and current == "completed":
+                final = json.loads(line.split(":", 1)[1].strip())
+    assert "discovering" in events
+    assert final and final["status"] == "NEEDS_SOURCES"
+    assert final["candidates"][0]["url"] == "https://ex.com/a"

@@ -8,6 +8,7 @@ just contributes nothing to the fused result. No paid API is ever called.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import re
 from html import unescape
@@ -146,12 +147,18 @@ class ClaudeWebProvider:
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
+        except OSError as e:
+            log.warning("claude_web_failed", error=str(e))
+            return None
+        try:
             out, _err = await asyncio.wait_for(
                 proc.communicate(prompt.encode()),
-                timeout=max(20, settings.AUTO_DISCOVERY_TIMEOUT_SECONDS * 3),
+                timeout=settings.AUTO_DISCOVERY_TIMEOUT_SECONDS,
             )
-        except (TimeoutError, OSError) as e:
-            log.warning("claude_web_failed", error=str(e))
+        except TimeoutError:
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+            log.warning("claude_web_timeout")
             return None
         if proc.returncode != 0:
             return None
