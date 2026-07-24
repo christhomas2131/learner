@@ -164,9 +164,7 @@ export function DiscoveryPanel({
               <Loader2 className="size-4 animate-spin" /> Adding &amp; verifying…
             </>
           ) : (
-            <>
-              Add {chosen.length} source{chosen.length === 1 ? "" : "s"} &amp; answer
-            </>
+            `Add ${chosen.length} source${chosen.length === 1 ? "" : "s"} & answer`
           )}
         </Button>
         <span className="text-xs text-muted-foreground">

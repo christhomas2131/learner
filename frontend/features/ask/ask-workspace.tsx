@@ -180,7 +180,7 @@ export function AskWorkspace({
         {liveMessage}
       </p>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto scroll-slim">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-5 md:p-8">
           {!showRun && (
             <div className="pt-4">
