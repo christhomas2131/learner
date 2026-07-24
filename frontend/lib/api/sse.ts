@@ -30,7 +30,24 @@ export async function streamAnswer(
     throw new Error(`Stream failed (${res.status})`);
   }
 
-  const reader = res.body.getReader();
+  await readSse(res, onEvent);
+}
+
+/** Stream live pipeline events for a premium queue item (GET SSE). */
+export async function streamQueueEvents(
+  queueId: string,
+  onEvent: (e: SseEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/v1/queue/${queueId}/events`, { signal });
+  if (!res.ok || !res.body) {
+    throw new Error(`Queue stream failed (${res.status})`);
+  }
+  await readSse(res, onEvent);
+}
+
+async function readSse(res: Response, onEvent: (e: SseEvent) => void): Promise<void> {
+  const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 

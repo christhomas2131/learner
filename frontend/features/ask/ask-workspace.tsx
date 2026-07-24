@@ -13,9 +13,9 @@ import { Button } from "@/components/ui/button";
 const ThinkingOrb = dynamic(() => import("thinking-orbs").then((m) => m.ThinkingOrb), {
   ssr: false,
 });
-import { answerResponse, type AnswerResponse } from "@/lib/api/schemas";
-import { streamAnswer } from "@/lib/api/sse";
-import { useAnswer, useQueueItem } from "@/lib/api/hooks";
+import { apiFetch } from "@/lib/api/client";
+import { answerResponse, enqueueResponse, type AnswerResponse } from "@/lib/api/schemas";
+import { streamAnswer, streamQueueEvents, type SseEvent } from "@/lib/api/sse";
 import { Composer, type AskMode } from "@/features/ask/composer";
 import { PipelineProgress } from "@/features/ask/pipeline-progress";
 import { AnswerView } from "@/features/ask/answer-view";
@@ -63,24 +63,6 @@ export function AskWorkspace({
   const [tab, setTab] = React.useState("claims");
   const abortRef = React.useRef<AbortController | null>(null);
 
-  // Poll premium queue item; when DONE, load the persisted answer.
-  const queue = useQueueItem(run.queueId, !!run.queueId);
-  const doneAnswerId = queue.data?.status === "DONE" ? queue.data.answer_id : null;
-  const persisted = useAnswer(doneAnswerId);
-
-  React.useEffect(() => {
-    if (persisted.data) {
-      setRun((r) => ({ ...r, answer: persisted.data!, streaming: false, queueId: null,
-        activeStage: null, reached: new Set(persisted.data!.pipeline.completed_stages) }));
-    }
-  }, [persisted.data]);
-
-  React.useEffect(() => {
-    if (queue.data?.status === "FAILED") {
-      setRun((r) => ({ ...r, streaming: false, error: queue.data?.error ?? "Worker failed" }));
-    }
-  }, [queue.data?.status, queue.data?.error]);
-
   async function ask(question: string, mode: AskMode) {
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -88,42 +70,48 @@ export function AskWorkspace({
     setSelectedCitation(null);
     setRun({ ...INITIAL, question, streaming: true });
 
+    const onEvent = (ev: SseEvent) =>
+      setRun((r) => {
+        const reached = new Set(r.reached);
+        let activeStage = r.activeStage;
+        let lastMessage = r.lastMessage;
+        const data = (ev.data ?? {}) as Record<string, unknown>;
+        if (ev.event === "pipeline_stage" && data.stage) {
+          activeStage = String(data.stage);
+          reached.add(activeStage);
+          lastMessage = String(data.message ?? "");
+        } else if (
+          ["source_retrieved", "draft_created", "claim_verification", "revision_started",
+            "release_gate"].includes(ev.event)
+        ) {
+          lastMessage = String(data.message ?? r.lastMessage);
+        } else if (ev.event === "completed") {
+          const parsed = answerResponse.safeParse(ev.data);
+          return {
+            ...r, streaming: false, activeStage: null,
+            answer: parsed.success ? parsed.data : r.answer,
+            error: parsed.success ? null : "Malformed response from server.",
+          };
+        } else if (ev.event === "failed") {
+          return { ...r, streaming: false, error: String(data.message ?? "Failed") };
+        }
+        return { ...r, reached, activeStage, lastMessage };
+      });
+
     try {
-      await streamAnswer(
-        { question, mode, session_id: sessionId ?? null },
-        (ev) => {
-          setRun((r) => {
-            const reached = new Set(r.reached);
-            let activeStage = r.activeStage;
-            let lastMessage = r.lastMessage;
-            const data = ev.data as Record<string, unknown>;
-            if (ev.event === "pipeline_stage" && data.stage) {
-              activeStage = String(data.stage);
-              reached.add(activeStage);
-              lastMessage = String(data.message ?? "");
-            } else if (["source_retrieved", "draft_created", "claim_verification",
-              "revision_started", "release_gate"].includes(ev.event)) {
-              lastMessage = String(data.message ?? r.lastMessage);
-            } else if (ev.event === "completed") {
-              const parsed = answerResponse.safeParse(ev.data);
-              return {
-                ...r,
-                streaming: false,
-                activeStage: null,
-                answer: parsed.success ? parsed.data : r.answer,
-                error: parsed.success ? null : "Malformed response from server.",
-              };
-            } else if (ev.event === "queued") {
-              return { ...r, queueId: String(data.queue_id), lastMessage:
-                "Queued for a Claude Code worker. Answer appears when a worker processes it." };
-            } else if (ev.event === "failed") {
-              return { ...r, streaming: false, error: String(data.message ?? "Failed") };
-            }
-            return { ...r, reached, activeStage, lastMessage };
-          });
-        },
-        controller.signal,
-      );
+      if (mode === "premium") {
+        // Enqueue, then stream the worker's live pipeline events over SSE.
+        const enq = await apiFetch("/api/v1/answers", enqueueResponse, {
+          method: "POST",
+          body: { question, mode: "premium", session_id: sessionId ?? null },
+        });
+        setRun((r) => ({ ...r, queueId: enq.queue_id, lastMessage: "Queued — waiting for a worker…" }));
+        await streamQueueEvents(enq.queue_id, onEvent, controller.signal);
+      } else {
+        await streamAnswer(
+          { question, mode, session_id: sessionId ?? null }, onEvent, controller.signal,
+        );
+      }
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         setRun((r) => ({ ...r, streaming: false, error: (e as Error).message }));
@@ -146,7 +134,9 @@ export function AskWorkspace({
   }
 
   const showRun = run.streaming || run.answer || run.error;
-  const waitingPremium = !!run.queueId && !run.answer;
+  // "Waiting for a worker" only until the first live pipeline event arrives;
+  // then the normal pipeline progress takes over.
+  const waitingPremium = !!run.queueId && !run.answer && run.reached.size === 0;
 
   return (
     <div className="flex h-full min-h-0">

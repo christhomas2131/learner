@@ -13,9 +13,11 @@ import asyncio
 from app.core.enums import QueueStatus
 from app.core.logging import get_logger
 from app.db.base import AsyncSessionLocal, utcnow
+from app.pipeline.events import COMPLETED, PipelineEvent
 from app.providers.claude_cli import ClaudeCliProvider
 from app.services import queue as queue_svc
-from app.services.audit import persist_result
+from app.services.audit import persist_result, to_response
+from app.services.event_hub import get_hub
 from app.services.pipeline_runner import build_pipeline
 from app.services.user import get_or_create_demo_user
 from app.services.worker_status import touch_heartbeat
@@ -27,15 +29,26 @@ async def _process_one(session, user, item, provider) -> str:  # noqa: ANN001
     item.status = QueueStatus.PROCESSING
     item.claimed_at = utcnow()
     await session.commit()
+    hub = get_hub()
+
+    async def emitter(ev: PipelineEvent) -> None:
+        # Stream stages live; the authoritative 'completed' (with the full
+        # response) is published below, so suppress the engine's own COMPLETED.
+        if ev.event != COMPLETED:
+            await hub.publish(item.id, ev.to_dict())
+
     pipeline = await build_pipeline(session, user.id, provider=provider)
     result = await pipeline.run(
         request_id=item.request_id,
         question=" ".join(item.question.split()),
         session_id=item.session_id,
         approved_source_ids=item.approved_source_ids,
+        emitter=emitter,
     )
-    answer_id, _audit = await persist_result(session, user_id=user.id, result=result)
+    answer_id, audit_id = await persist_result(session, user_id=user.id, result=result)
     await queue_svc.complete_item(session, item, answer_id)
+    resp = to_response(result, audit_id=audit_id).model_dump(mode="json")
+    await hub.publish(item.id, {"event": "completed", "data": resp, "terminal": True})
     return str(result.status)
 
 
@@ -54,6 +67,10 @@ async def run_drainer(interval: float, stop: asyncio.Event) -> None:
                         log.info("premium_drained", item=item.id, status=status)
                     except Exception as e:  # noqa: BLE001
                         await queue_svc.fail_item(session, item, str(e))
+                        await get_hub().publish(
+                            item.id,
+                            {"event": "failed", "data": {"message": str(e)}, "terminal": True},
+                        )
                         log.warning("premium_drain_failed", item=item.id, error=str(e))
         except Exception as e:  # noqa: BLE001
             log.warning("premium_drainer_error", error=str(e))
