@@ -31,3 +31,16 @@ test("theme can be switched in settings", async ({ page }) => {
   await page.getByRole("button", { name: "dark", exact: true }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
 });
+
+test("a miss offers web sources to review (auto-discovery)", async ({ page }) => {
+  // Backend runs the offline fixture provider, which returns canned candidates
+  // for this query. Assert the review panel + candidates + confirm button; we
+  // don't click Confirm (that would re-fetch the real pages over the network).
+  await page.goto("/");
+  await page.getByLabel("Question").fill("Who was Ada Lovelace?");
+  await page.getByRole("button", { name: /^ask/i }).click();
+  await expect(page.getByRole("heading", { name: /not in your sources yet/i }))
+    .toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Ada Lovelace", { exact: false }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /add 2 sources & answer/i })).toBeVisible();
+});

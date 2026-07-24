@@ -213,8 +213,32 @@ def _discovery_prompt(query: str, limit: int) -> str:
     )
 
 
+class FixtureDiscoveryProvider:
+    """Deterministic, offline provider for e2e/tests only (gated by
+    AUTO_DISCOVERY_FIXTURE). Returns canned candidates for a known query so the
+    discovery UI can be exercised without the network; returns nothing for other
+    queries, so an ordinary abstention still abstains."""
+
+    name = "fixture"
+
+    async def search(self, query: str, *, limit: int) -> list[Candidate]:
+        if "lovelace" not in query.lower():
+            return []
+        canned = [
+            Candidate(url="https://en.wikipedia.org/wiki/Ada_Lovelace", title="Ada Lovelace",
+                      snippet="English mathematician, regarded as the first computer programmer.",
+                      providers=[self.name]),
+            Candidate(url="https://www.britannica.com/biography/Ada-Lovelace",
+                      title="Ada Lovelace | Britannica", snippet="Biography of Ada Lovelace.",
+                      providers=[self.name]),
+        ]
+        return canned[:limit]
+
+
 def enabled_providers() -> list[DiscoveryProvider]:
     """The discovery providers switched on in settings (each keyless)."""
+    if settings.AUTO_DISCOVERY_FIXTURE:  # e2e/tests: deterministic + offline
+        return [FixtureDiscoveryProvider()]
     provs: list[DiscoveryProvider] = []
     if settings.AUTO_DISCOVERY_WIKIPEDIA:
         provs.append(WikipediaProvider())

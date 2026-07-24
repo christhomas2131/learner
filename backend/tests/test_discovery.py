@@ -148,6 +148,15 @@ async def test_claude_web_unavailable_returns_empty(monkeypatch):
     assert await providers_mod.ClaudeWebProvider().search("q", limit=5) == []
 
 
+async def test_fixture_provider_gated_and_query_scoped(monkeypatch):
+    monkeypatch.setattr(settings, "AUTO_DISCOVERY_FIXTURE", True)
+    provs = providers_mod.enabled_providers()
+    assert [p.name for p in provs] == ["fixture"]  # real (network) providers bypassed
+    assert await provs[0].search("who won the world cup", limit=8) == []  # abstains still abstain
+    hits = await provs[0].search("who was ada lovelace", limit=8)
+    assert len(hits) == 2 and all(c.providers == ["fixture"] for c in hits)
+
+
 # ------------------------------------------------------- discover() orchestration
 
 class _FakeProvider:

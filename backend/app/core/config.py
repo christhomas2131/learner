@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     # (model/permission/tool availability vary by environment) and could surface
     # hallucinated URLs. Opt in only where the local `claude` CLI web-searches.
     AUTO_DISCOVERY_CLAUDE_WEB: bool = False
+    # e2e/tests only: a deterministic, offline discovery provider (no network).
+    AUTO_DISCOVERY_FIXTURE: bool = False
 
     CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     LOG_LEVEL: str = "INFO"
