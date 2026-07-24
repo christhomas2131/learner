@@ -21,6 +21,7 @@ from app.core.enums import (
 from app.core.logging import get_logger
 from app.pipeline import gate
 from app.pipeline.contradiction import ContradictionHit, find_contradiction
+from app.pipeline.decompose import decompose
 from app.pipeline.events import (
     CLAIM_VERIFICATION,
     COMPLETED,
@@ -103,6 +104,7 @@ class VerifiedLearningPipeline:
         max_pipeline_attempts: int = 2,
         definition_records: list[dict] | None = None,
         answer_key_records: list[dict] | None = None,
+        decompose_questions: bool = True,
     ) -> None:
         self._retriever = retriever
         self._provider = provider
@@ -111,6 +113,7 @@ class VerifiedLearningPipeline:
         self._max_pipeline_attempts = max_pipeline_attempts
         self._definition_records = definition_records or []
         self._answer_key_records = answer_key_records or []
+        self._decompose = decompose_questions
 
     async def run(
         self,
@@ -175,7 +178,7 @@ class VerifiedLearningPipeline:
 
         # ---- Stage 3: RETRIEVE -------------------------------------------- #
         await emit(PipelineEvent(PIPELINE_STAGE, PipelineStage.RETRIEVE, "Retrieving approved sources"))
-        passages = await self._retriever.retrieve(question, approved_source_ids, self._retrieval_limit)
+        passages = await self._retrieve(question, approved_source_ids)
         completed.append(PipelineStage.RETRIEVE)
         await emit(
             PipelineEvent(SOURCE_RETRIEVED, PipelineStage.RETRIEVE,
@@ -289,6 +292,26 @@ class VerifiedLearningPipeline:
     # ------------------------------------------------------------------ #
     # Stage helpers
     # ------------------------------------------------------------------ #
+
+    async def _retrieve(
+        self, question: str, approved_source_ids: list[str] | None
+    ) -> list[RetrievedPassage]:
+        limit = self._retrieval_limit
+        subqs = decompose(question) if self._decompose else [question]
+        if len(subqs) <= 1:
+            return await self._retriever.retrieve(question, approved_source_ids, limit)
+
+        # Multi-hop: retrieve per sub-question AND the whole question, merged
+        # (dedup by passage id). Purely additive — never worse than single.
+        seen: set[str] = set()
+        merged: list[RetrievedPassage] = []
+        per = max(3, limit // len(subqs) + 1)
+        for query, n in [(sq, per) for sq in subqs] + [(question, limit)]:
+            for p in await self._retriever.retrieve(query, approved_source_ids, n):
+                if p.passage_id not in seen:
+                    seen.add(p.passage_id)
+                    merged.append(p)
+        return merged[: max(limit, len(subqs) * 3)]
 
     def _validate_input(self, question: str) -> str:
         if question is None:

@@ -38,6 +38,7 @@ async def build_pipeline(
         max_model_retries=settings.MAX_MODEL_RETRIES,
         max_pipeline_attempts=settings.MAX_PIPELINE_ATTEMPTS,
         definition_records=definitions, answer_key_records=answer_keys,
+        decompose_questions=settings.RETRIEVAL_DECOMPOSE,
     )
 
 

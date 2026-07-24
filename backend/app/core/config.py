@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     RETRIEVAL_USE_EMBEDDINGS: bool = True
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     RRF_K: int = 60
+    # Multi-hop: split clearly-compound questions and merge per-part retrieval.
+    RETRIEVAL_DECOMPOSE: bool = True
 
     CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     LOG_LEVEL: str = "INFO"
