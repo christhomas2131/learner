@@ -7,8 +7,9 @@ test("ask a supported question and get a verified, cited answer", async ({ page 
   await page.getByLabel("Question").fill("What is photosynthesis?");
   await page.getByRole("button", { name: /^ask/i }).click();
 
-  // Verified status appears.
-  await expect(page.getByText("Verified", { exact: false })).toBeVisible({ timeout: 30_000 });
+  // Verified verdict appears. Target the heading specifically — "Verified" also
+  // appears in the sr-only a11y live region, so a bare getByText is ambiguous.
+  await expect(page.getByRole("heading", { name: /verified/i })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/photosynthesis/i).first()).toBeVisible();
 });
 
@@ -16,7 +17,7 @@ test("unsupported question abstains", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Question").fill("Who won the 2050 World Cup?");
   await page.getByRole("button", { name: /^ask/i }).click();
-  await expect(page.getByText(/Insufficient Evidence/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: /insufficient evidence/i })).toBeVisible({ timeout: 30_000 });
 });
 
 test("knowledge library lists sources", async ({ page }) => {
