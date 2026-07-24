@@ -109,6 +109,15 @@ export function useUploadSource() {
   });
 }
 
+export function useAddWebsite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { url: string; subject_id?: string }) =>
+      apiFetch("/api/v1/sources/website", sourceOut, { method: "POST", body: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sources"] }),
+  });
+}
+
 export function useSourceAction() {
   const qc = useQueryClient();
   return useMutation({

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import Pagination, get_current_user, get_session, pagination
 from app.api.errors import APIError, NotFoundError, ValidationError
-from app.api.schemas import Page, PassageOut, SourceOut, UpdateSourceRequest
+from app.api.schemas import Page, PassageOut, SourceOut, UpdateSourceRequest, WebsiteRequest
 from app.core.enums import SourceState
 from app.ingestion.service import (
     DuplicateSourceError,
@@ -15,6 +15,7 @@ from app.ingestion.service import (
     IngestionError,
     UnsupportedFileError,
     ingest_file,
+    ingest_website,
     reindex_source,
     set_source_state,
 )
@@ -70,6 +71,24 @@ async def upload_source(
         raise APIError("duplicate_source", str(e), 409) from e
     except (UnsupportedFileError, EmptyDocumentError) as e:
         raise ValidationError(str(e)) from e
+    except IngestionError as e:
+        raise ValidationError(str(e)) from e
+    return await _to_out(session, src)
+
+
+@router.post("/sources/website", response_model=SourceOut, status_code=201)
+async def add_website(
+    body: WebsiteRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SourceOut:
+    try:
+        src = await ingest_website(
+            session, user_id=user.id, url=body.url, title=body.title,
+            subject_id=body.subject_id,
+        )
+    except DuplicateSourceError as e:
+        raise APIError("duplicate_source", str(e), 409) from e
     except IngestionError as e:
         raise ValidationError(str(e)) from e
     return await _to_out(session, src)

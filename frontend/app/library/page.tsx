@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api/client";
 import {
+  useAddWebsite,
   useDeleteSource,
   usePassages,
   useSourceAction,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/api/hooks";
 import type { SourceOut } from "@/lib/api/schemas";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/misc";
@@ -33,8 +35,25 @@ export default function LibraryPage() {
     state: filter === "ALL" ? undefined : filter,
   });
   const upload = useUploadSource();
+  const addWebsite = useAddWebsite();
+  const [url, setUrl] = React.useState("");
   const [inspect, setInspect] = React.useState<SourceOut | null>(null);
   const [dragging, setDragging] = React.useState(false);
+
+  function submitUrl() {
+    const u = url.trim();
+    if (!u) return;
+    addWebsite.mutate(
+      { url: u },
+      {
+        onSuccess: () => {
+          toast.success("Website snapshotted — pending approval");
+          setUrl("");
+        },
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not add website"),
+      },
+    );
+  }
 
   const pending = data?.items.filter((s) => s.state === "PENDING_APPROVAL") ?? [];
 
@@ -91,6 +110,19 @@ export default function LibraryPage() {
           onChange={(e) => handleFiles(e.target.files)}
         />
       </label>
+
+      <div className="mb-6 flex items-center gap-2">
+        <Input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submitUrl()}
+          placeholder="…or paste a URL to snapshot an approved website"
+          aria-label="Website URL"
+        />
+        <Button variant="outline" onClick={submitUrl} disabled={!url.trim() || addWebsite.isPending}>
+          {addWebsite.isPending ? "Fetching…" : "Add website"}
+        </Button>
+      </div>
 
       {pending.length > 0 && (
         <div className="mb-6 rounded-lg border border-insufficient/30 bg-insufficient-subtle p-4">

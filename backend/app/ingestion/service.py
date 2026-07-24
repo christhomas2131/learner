@@ -185,6 +185,54 @@ async def ingest_structured(
     return source
 
 
+async def ingest_website(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    url: str,
+    title: str | None = None,
+    subject_id: str | None = None,
+    is_demo: bool = False,
+) -> Source:
+    """Fetch, snapshot, and ingest a web page as an APPROVED_WEBSITE source.
+
+    The stored passages are the snapshot the pipeline will cite — never live
+    page content.
+    """
+    from app.db.base import utcnow
+    from app.ingestion.web import WebFetchError, fetch_and_extract
+
+    try:
+        page_title, text = await fetch_and_extract(url)
+    except WebFetchError as e:
+        raise IngestionError(str(e)) from e
+
+    digest = content_hash(f"{url}\n{text}".encode())
+    dup = await _find_duplicate(session, user_id, digest)
+    if dup is not None:
+        raise DuplicateSourceError(dup.id)
+
+    source = Source(
+        user_id=user_id, title=title or page_title, source_type=SourceType.APPROVED_WEBSITE,
+        state=SourceState.PROCESSING, is_demo=is_demo, content_hash=digest, url=url,
+        subject_id=subject_id, byte_size=len(text.encode()),
+        structured_data={"kind": "APPROVED_WEBSITE", "url": url,
+                         "fetched_at": utcnow().isoformat()},
+    )
+    session.add(source)
+    await session.flush()
+
+    passages = await _create_passages(session, source, text)
+    fts_rows = [(p.id, source.id, p.text) for p in passages]
+    await index_passages(session, fts_rows)
+    await _index_vectors(session, fts_rows)
+    session.add(IngestionJob(source_id=source.id, state="DONE", passage_count=len(passages)))
+    source.state = SourceState.PENDING_APPROVAL
+    await session.commit()
+    await session.refresh(source)
+    return source
+
+
 async def _create_passages(session: AsyncSession, source: Source, text: str) -> list[SourcePassage]:
     passages: list[SourcePassage] = []
     for chunk in chunk_text(text):

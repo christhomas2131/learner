@@ -93,6 +93,12 @@ class SubjectOut(BaseModel):
 # ---- Sources ---- #
 
 
+class WebsiteRequest(BaseModel):
+    url: str = Field(min_length=4, max_length=2000)
+    subject_id: str | None = None
+    title: str | None = None
+
+
 class UpdateSourceRequest(BaseModel):
     title: str | None = None
     subject_id: str | None = None
